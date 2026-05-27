@@ -16,6 +16,7 @@ DEFAULTS = {
     "compiler": r"D:\TI\CCS\ccs\tools\compiler\ti-cgt-armllvm_4.0.3.LTS",
     "sdk_examples": r"D:\TI\CCS\mspm0_sdk_2_05_01_00\examples\nortos\LP_MSPM0G3519\driverlib",
     "probe": "XDS110",
+    "oled_ui_source": "",
 }
 
 
@@ -32,6 +33,10 @@ def main() -> None:
     ccs_root = _prompt("CCS 安装目录", DEFAULTS["ccs_root"])
     sdk_root = _prompt("MSPM0 SDK 目录", DEFAULTS["sdk_root"])
     probe = _prompt("调试探针 (XDS110/JLink)", DEFAULTS["probe"])
+    oled_ui = _prompt(
+        "OLED_UI 仓库路径 (留空跳过，需要时可通过 --source 指定)",
+        DEFAULTS["oled_ui_source"],
+    )
 
     config = {
         "ccs_root": ccs_root,
@@ -44,6 +49,7 @@ def main() -> None:
             Path(sdk_root) / "examples/nortos/LP_MSPM0G3519/driverlib"
         ),
         "probe": probe,
+        "oled_ui_source": oled_ui,
     }
 
     config_path.write_text(

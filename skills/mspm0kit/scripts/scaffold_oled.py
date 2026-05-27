@@ -2,21 +2,34 @@
 """Generate a minimal OLED UI framework project for Tianqiaoxing G3519."""
 from __future__ import annotations
 
+import json
 import shutil
 from pathlib import Path
 
-# Source OLED_UI repo (user's local copy)
-DEFAULT_SOURCE = r"E:\github\OLED_UI\OLED_UI_Examples\MSPM0G3519\ccs\oeldui"
 
+def _load_config(config_path: str) -> dict:
+    with open(config_path, encoding="utf-8") as f:
+        return json.load(f)
 
-def _find_source(source: str | None) -> Path:
-    paths = [Path(source) if source else None, Path(DEFAULT_SOURCE)]
-    for p in paths:
-        if p and p.is_dir() and (p / "oledUI" / "OLED.c").exists():
+def _find_source(source: str | None, config: dict) -> Path:
+    """Find OLED_UI source: explicit --source arg, then config.json, then fail."""
+    if source:
+        p = Path(source)
+        if p.is_dir() and (p / "oledUI" / "OLED.c").exists():
             return p
+
+    cfg_path = config.get("oled_ui_source", "")
+    if cfg_path:
+        p = Path(cfg_path)
+        if p.is_dir() and (p / "oledUI" / "OLED.c").exists():
+            return p
+
     raise FileNotFoundError(
-        "Cannot find OLED_UI repo. Clone from https://github.com/LaoGuaiGe/OLED_UI "
-        "or pass --source <path>"
+        "Cannot find OLED_UI repo.\n"
+        "Options:\n"
+        "  1. Run setup.py to configure the path\n"
+        "  2. Pass --source <path> to this script\n"
+        "  3. Clone from https://github.com/LaoGuaiGe/OLED_UI"
     )
 
 
@@ -390,11 +403,14 @@ def main(
     project_name: str,
     output_dir: str | None = None,
     source: str | None = None,
+    config_path: str | None = None,
     with_imu: bool = False,
     with_ws2812: bool = False,
     with_wireless: bool = False,
 ) -> Path:
-    src_root = _find_source(source)
+    cfg_file = config_path or str(Path(__file__).resolve().parents[1] / "config.json")
+    config = _load_config(cfg_file) if Path(cfg_file).exists() else {}
+    src_root = _find_source(source, config)
     out = Path(output_dir or Path.cwd()) / project_name
     out.mkdir(parents=True, exist_ok=True)
 
@@ -488,8 +504,9 @@ def main(
     if linker_src.exists():
         shutil.copy2(linker_src, out / "ticlang" / "device_linker.cmd")
     else:
-        sdk_cmd = Path(r"D:\TI\CCS\mspm0_sdk_2_05_01_00\examples\nortos\LP_MSPM0G3519\driverlib\gpio_toggle_output\ticlang\device_linker.cmd")
-        if sdk_cmd.exists():
+        sdk_examples = config.get("sdk_examples", "")
+        sdk_cmd = Path(sdk_examples) / "gpio_toggle_output" / "ticlang" / "device_linker.cmd" if sdk_examples else None
+        if sdk_cmd and sdk_cmd.exists():
             shutil.copy2(sdk_cmd, out / "ticlang" / "device_linker.cmd")
 
     # ── 10. projectspec ──
@@ -515,7 +532,9 @@ if __name__ == "__main__":
     args = p.parse_args()
 
     result = main(
-        args.project_name, args.output, args.source,
+        project_name=args.project_name,
+        output_dir=args.output,
+        source=args.source,
         with_imu=args.with_imu,
         with_ws2812=args.with_ws2812,
         with_wireless=args.with_wireless,
