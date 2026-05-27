@@ -15,7 +15,7 @@ def test_config_json_written():
         setup.CONFIG_DIR = Path(tmp)
 
         try:
-            with patch("builtins.input", side_effect=["", "", ""]):
+            with patch("builtins.input", side_effect=["", "", "", ""]):
                 setup.main()
 
             cfg_path = Path(tmp) / "config.json"
@@ -23,7 +23,8 @@ def test_config_json_written():
             cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
 
             for k in ("ccs_root", "sdk_root", "sysconfig_cli",
-                       "dslite", "gmake", "compiler", "sdk_examples", "probe"):
+                       "dslite", "gmake", "compiler", "sdk_examples",
+                       "probe", "oled_ui_source"):
                 assert k in cfg, f"Missing key: {k}"
         finally:
             setup.CONFIG_DIR = orig
@@ -37,7 +38,7 @@ def test_user_override():
 
         try:
             with patch("builtins.input",
-                        side_effect=[r"C:\my\ccs", r"C:\my\sdk", "JLink"]):
+                        side_effect=[r"C:\my\ccs", r"C:\my\sdk", "JLink", ""]):
                 setup.main()
 
             cfg = json.loads((Path(tmp) / "config.json").read_text(encoding="utf-8"))

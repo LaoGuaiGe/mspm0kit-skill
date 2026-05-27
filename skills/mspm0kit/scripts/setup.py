@@ -20,21 +20,26 @@ DEFAULTS = {
 }
 
 
-def _prompt(label: str, default: str) -> str:
-    value = input(f"{label} [{default}]: ").strip()
+def _safe_prompt(label: str, default: str) -> str:
+    """Prompt with encoding-safe fallback for Windows terminals."""
+    try:
+        value = input(f"{label} [{default}]: ").strip()
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        safe = label.encode("ascii", errors="replace").decode("ascii")
+        value = input(f"{safe} [{default}]: ").strip()
     return value if value else default
 
 
 def main() -> None:
     config_path = CONFIG_DIR / "config.json"
-    print("天巧星 MSPM0G3519 Skill — 首次配置")
-    print("-" * 40)
+    print("mspm0kit Skill Setup")
+    print("-" * 22)
 
-    ccs_root = _prompt("CCS 安装目录", DEFAULTS["ccs_root"])
-    sdk_root = _prompt("MSPM0 SDK 目录", DEFAULTS["sdk_root"])
-    probe = _prompt("调试探针 (XDS110/JLink)", DEFAULTS["probe"])
-    oled_ui = _prompt(
-        "OLED_UI 仓库路径 (留空跳过，需要时可通过 --source 指定)",
+    ccs_root = _safe_prompt("CCS install dir", DEFAULTS["ccs_root"])
+    sdk_root = _safe_prompt("MSPM0 SDK dir", DEFAULTS["sdk_root"])
+    probe = _safe_prompt("Debug probe (XDS110/JLink)", DEFAULTS["probe"])
+    oled_ui = _safe_prompt(
+        "OLED_UI repo path (optional, leave empty to skip)",
         DEFAULTS["oled_ui_source"],
     )
 
@@ -55,7 +60,7 @@ def main() -> None:
     config_path.write_text(
         json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"\n配置已保存到: {config_path}")
+    print(f"Config saved to: {config_path}")
 
 
 if __name__ == "__main__":
