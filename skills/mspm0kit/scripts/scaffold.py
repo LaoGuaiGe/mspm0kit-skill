@@ -96,15 +96,24 @@ def main(
 
     is_skill_example = (skill_examples_dir / sdk_example).is_dir()
 
-    # 1. Copy source files
+    # 1. Copy .c files — ALL to project root (CCS requires flat .c structure)
     c_files = list(source_dir.glob("*.c"))
-    for cf in c_files:
-        if cf.stem == "main":
-            shutil.copy2(cf, out / "main.c")
+    src_c_files = list((source_dir / "src").glob("*.c")) if (source_dir / "src").is_dir() else []
+    for cf in c_files + src_c_files:
+        if cf.stem == "main" or cf.parent.name == "src":
+            shutil.copy2(cf, out / cf.name)
         else:
             _copy_and_rename(cf, out, sdk_example, project_name)
 
-    # 2. Copy .syscfg
+    # 2. Copy .h files from src/ to project root (for skill examples, .h stay in src/)
+    src_dir = source_dir / "src"
+    if src_dir.is_dir():
+        dst_headers = out / "src"
+        dst_headers.mkdir(exist_ok=True)
+        for f in src_dir.glob("*.h"):
+            shutil.copy2(f, dst_headers / f.name)
+
+    # 3. Copy .syscfg
     syscfg_files = list(source_dir.glob("*.syscfg"))
     for sf in syscfg_files:
         content = sf.read_text(encoding="utf-8", errors="replace")
@@ -119,29 +128,8 @@ def main(
             out_name = sf.name.replace(sdk_example, project_name)
         (out / out_name).write_text(content, encoding="utf-8")
 
-    # 3. Copy src/ directory for skill-bundled examples
-    src_dir = source_dir / "src"
-    if src_dir.is_dir():
-        dst_src = out / "src"
-        dst_src.mkdir(exist_ok=True)
-        for f in src_dir.glob("*"):
-            if f.is_file():
-                shutil.copy2(f, dst_src / f.name)
-
-    # 4. device_linker.cmd
-    ticlang_src = source_dir / "ticlang"
-    ticlang_dst = out / "ticlang"
-    ticlang_dst.mkdir(exist_ok=True)
-    linker_cmd = ticlang_src / "device_linker.cmd"
-    if linker_cmd.exists():
-        shutil.copy2(linker_cmd, ticlang_dst / "device_linker.cmd")
-    else:
-        sdk_cmd = sdk_examples_dir / "gpio_toggle_output" / "ticlang" / "device_linker.cmd" if sdk_examples_dir else None
-        if sdk_cmd and sdk_cmd.exists():
-            shutil.copy2(sdk_cmd, ticlang_dst / "device_linker.cmd")
-
-    # 5. Generate .projectspec
-    pspec_files = list(ticlang_src.glob("*.projectspec"))
+    # 4. Generate .projectspec
+    pspec_files = list((source_dir / "ticlang").glob("*.projectspec")) if (source_dir / "ticlang").is_dir() else []
     if pspec_files:
         for ps in pspec_files:
             content = ps.read_text(encoding="utf-8", errors="replace")

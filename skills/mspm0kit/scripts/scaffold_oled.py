@@ -409,12 +409,12 @@ PROJECTSPEC_TEMPLATE = """\
         <property name="isHybrid" value="true"/>
         <file path="main.c" openOnCreation="true" excludeFromBuild="false" action="copy"/>
         <file path="{project_name}.syscfg" openOnCreation="true" excludeFromBuild="false" action="copy"/>
-        <file path="oledUI/OLED.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="oledUI/OLED_driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="oledUI/OLED_Fonts.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="oledUI/oled_ext_font.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="hardware/myiic.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="hardware/hw_delay.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="myiic.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="hw_delay.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="OLED.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="OLED_driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="OLED_Fonts.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="oled_ext_font.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
 {menu_file_entries}
 {extra_file_entries}
     </project>
@@ -458,83 +458,90 @@ def main(
     extra_files = ""
     syscfg_addon = ""
 
-    # ── directories ──
-    for d in ["oledUI", "hardware", "app", "middle", "ticlang"]:
+    # ── directories (headers only, .c files go in root for CCS compatibility) ──
+    for d in ["oledUI", "hardware", "app", "middle"]:
         (out / d).mkdir(exist_ok=True)
 
     is_menu = (mode == "menu")
 
-    # ── 1. Copy as-is: core OLED files (always) ──
-    core_stems = ["OLED.c", "OLED.h", "OLED_driver.c", "OLED_driver.h",
-                  "OLED_Fonts.c", "OLED_Fonts.h",
-                  "oled_ext_font.c", "oled_ext_font.h",
-                  "OLED_UI_Driver.h"]
-    for stem in core_stems:
+    # ── 1. Copy core OLED files ──
+    # .c files → project root, .h files → oledUI/ (or hardware/ for myiic)
+    oled_c_files = ["OLED.c", "OLED_driver.c", "OLED_Fonts.c", "oled_ext_font.c"]
+    for stem in oled_c_files:
+        src_file = src_root / "oledUI" / stem
+        if src_file.exists():
+            shutil.copy2(src_file, out / stem)
+
+    oled_h_files = ["OLED.h", "OLED_driver.h", "OLED_Fonts.h", "oled_ext_font.h",
+                    "OLED_UI_Driver.h"]
+    for stem in oled_h_files:
         src_file = src_root / "oledUI" / stem
         if src_file.exists():
             shutil.copy2(src_file, out / "oledUI" / stem)
 
-    # Menu mode files
     if is_menu:
+        # .c to root
+        _trim_file(src_root / "oledUI" / "OLED_UI.c", out / "OLED_UI.c",
+                   remove_includes=['#include "app_task.h"'])
+        _trim_file(src_root / "oledUI" / "OLED_UI_Driver.c", out / "OLED_UI_Driver.c",
+                   remove_includes=['#include "hw_encoder.h"'])
+        (out / "OLED_UI_MenuData.c").write_text(MENU_DATA_C, encoding="utf-8")
+        # .h to subdirs
         shutil.copy2(src_root / "oledUI" / "OLED_UI.h", out / "oledUI" / "OLED_UI.h")
         shutil.copy2(src_root / "oledUI" / "OLED_UI_MenuData.h", out / "oledUI" / "OLED_UI_MenuData.h")
-        _trim_file(
-            src_root / "oledUI" / "OLED_UI.c",
-            out / "oledUI" / "OLED_UI.c",
-            remove_includes=['#include "app_task.h"'],
-        )
-        _trim_file(
-            src_root / "oledUI" / "OLED_UI_Driver.c",
-            out / "oledUI" / "OLED_UI_Driver.c",
-            remove_includes=['#include "hw_encoder.h"'],
-        )
-        (out / "oledUI" / "OLED_UI_MenuData.c").write_text(MENU_DATA_C, encoding="utf-8")
+        # Stub files
         (out / "app" / "app_task_stub.h").write_text(APP_TASK_STUB_H, encoding="utf-8")
-        (out / "app" / "app_task_stub.c").write_text(APP_TASK_STUB_C, encoding="utf-8")
+        (out / "app_task_stub.c").write_text(APP_TASK_STUB_C, encoding="utf-8")
         (out / "hardware" / "hw_encoder_stub.h").write_text(HW_ENCODER_STUB_H, encoding="utf-8")
-        ui_c = (out / "oledUI" / "OLED_UI.c").read_text(encoding="utf-8")
+        # Fix OLED_UI.c include
+        ui_c = (out / "OLED_UI.c").read_text(encoding="utf-8")
         ui_c = '#include "app_task_stub.h"\n' + ui_c
-        (out / "oledUI" / "OLED_UI.c").write_text(ui_c, encoding="utf-8")
+        (out / "OLED_UI.c").write_text(ui_c, encoding="utf-8")
 
-    # ── 2. Hardware deps ──
-    shutil.copy2(src_root / "hardware" / "myiic.c", out / "hardware" / "myiic.c")
-    shutil.copy2(src_root / "hardware" / "myiic.h", out / "hardware" / "myiic.h")
-    shutil.copy2(src_root / "hardware" / "hw_delay.c", out / "hardware" / "hw_delay.c")
-    shutil.copy2(src_root / "hardware" / "hw_delay.h", out / "hardware" / "hw_delay.h")
+    # ── 2. Hardware deps (.c to root, .h to hardware/) ──
+    for stem in ["myiic.c", "hw_delay.c"]:
+        shutil.copy2(src_root / "hardware" / stem, out / stem)
+    for stem in ["myiic.h", "hw_delay.h"]:
+        shutil.copy2(src_root / "hardware" / stem, out / "hardware" / stem)
 
     # ── 3. Optional modules ──
 
     if with_imu:
-        shutil.copy2(src_root / "hardware" / "hw_lsm6ds3.c", out / "hardware" / "hw_lsm6ds3.c")
-        shutil.copy2(src_root / "hardware" / "hw_lsm6ds3.h", out / "hardware" / "hw_lsm6ds3.h")
-        for f in ["FusionAhrs.c", "FusionAhrs.h", "FusionOffset.c", "FusionOffset.h",
-                   "FusionConvention.h", "FusionMath.h"]:
-            shutil.copy2(src_root / "middle" / f, out / "middle" / f)
+        # .c to root
+        for c_stem in ["hw_lsm6ds3.c", "FusionAhrs.c", "FusionOffset.c"]:
+            src_file = (src_root / "hardware" / c_stem) if c_stem.startswith("hw_") else (src_root / "middle" / c_stem)
+            if src_file.exists():
+                shutil.copy2(src_file, out / c_stem)
+        # .h to subdirs
+        for h_stem in ["hw_lsm6ds3.h"]:
+            shutil.copy2(src_root / "hardware" / h_stem, out / "hardware" / h_stem)
+        for h_stem in ["FusionAhrs.h", "FusionOffset.h", "FusionConvention.h", "FusionMath.h"]:
+            shutil.copy2(src_root / "middle" / h_stem, out / "middle" / h_stem)
         syscfg_addon += SYSCFG_IMU_ADDON
-        extra_files += '\n        <file path="hardware/hw_lsm6ds3.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
-        extra_files += '\n        <file path="middle/FusionAhrs.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
-        extra_files += '\n        <file path="middle/FusionOffset.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="hw_lsm6ds3.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="FusionAhrs.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="FusionOffset.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
 
     if with_ws2812:
-        shutil.copy2(src_root / "hardware" / "hw_ws2812.c", out / "hardware" / "hw_ws2812.c")
-        shutil.copy2(src_root / "hardware" / "hw_ws2812.h", out / "hardware" / "hw_ws2812.h")
-        shutil.copy2(src_root / "hardware" / "hw_ws2812_effects.c", out / "hardware" / "hw_ws2812_effects.c")
-        shutil.copy2(src_root / "hardware" / "hw_ws2812_effects.h", out / "hardware" / "hw_ws2812_effects.h")
+        for c_stem in ["hw_ws2812.c", "hw_ws2812_effects.c"]:
+            shutil.copy2(src_root / "hardware" / c_stem, out / c_stem)
+        for h_stem in ["hw_ws2812.h", "hw_ws2812_effects.h"]:
+            shutil.copy2(src_root / "hardware" / h_stem, out / "hardware" / h_stem)
         syscfg_addon += SYSCFG_WS2812_ADDON
-        extra_files += '\n        <file path="hardware/hw_ws2812.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
-        extra_files += '\n        <file path="hardware/hw_ws2812_effects.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="hw_ws2812.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="hw_ws2812_effects.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
 
     if with_wireless:
-        shutil.copy2(src_root / "middle" / "mid_wireless_uart.c", out / "middle" / "mid_wireless_uart.c")
+        shutil.copy2(src_root / "middle" / "mid_wireless_uart.c", out / "mid_wireless_uart.c")
         shutil.copy2(src_root / "middle" / "mid_wireless_uart.h", out / "middle" / "mid_wireless_uart.h")
         syscfg_addon += SYSCFG_WIRELESS_ADDON
-        extra_files += '\n        <file path="middle/mid_wireless_uart.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="mid_wireless_uart.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
 
     if need_timer:
         (out / "middle" / "mid_timer.h").write_text(MID_TIMER_STUB_H, encoding="utf-8")
-        (out / "middle" / "mid_timer.c").write_text(MID_TIMER_STUB_C, encoding="utf-8")
+        (out / "mid_timer.c").write_text(MID_TIMER_STUB_C, encoding="utf-8")
         syscfg_addon += SYSCFG_TIMER_ADDON
-        extra_files += '\n        <file path="middle/mid_timer.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="mid_timer.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
 
     # ── 4. Generated files ──
     if is_menu:
@@ -545,23 +552,13 @@ def main(
     syscfg_content = SYSCFG_TEMPLATE + syscfg_addon
     (out / f"{project_name}.syscfg").write_text(syscfg_content, encoding="utf-8")
 
-    # ── 9. device_linker.cmd ──
-    linker_src = src_root / "ticlang" / "device_linker.cmd"
-    if linker_src.exists():
-        shutil.copy2(linker_src, out / "ticlang" / "device_linker.cmd")
-    else:
-        sdk_examples = config.get("sdk_examples", "")
-        sdk_cmd = Path(sdk_examples) / "gpio_toggle_output" / "ticlang" / "device_linker.cmd" if sdk_examples else None
-        if sdk_cmd and sdk_cmd.exists():
-            shutil.copy2(sdk_cmd, out / "ticlang" / "device_linker.cmd")
-
-    # ── 10. projectspec ──
+    # ── 5. projectspec — CCS auto-generates device_linker.cmd via SysConfig ──
     menu_files = ""
     if is_menu:
-        menu_files = '\n        <file path="oledUI/OLED_UI.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
-        menu_files += '\n        <file path="oledUI/OLED_UI_Driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
-        menu_files += '\n        <file path="oledUI/OLED_UI_MenuData.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
-        menu_files += '\n        <file path="app/app_task_stub.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files = '\n        <file path="OLED_UI.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="OLED_UI_Driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="OLED_UI_MenuData.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="app_task_stub.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
 
     pspec = PROJECTSPEC_TEMPLATE.format(
         project_name=project_name,

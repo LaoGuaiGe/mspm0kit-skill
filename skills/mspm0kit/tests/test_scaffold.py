@@ -83,7 +83,7 @@ def test_scaffold_copies_files():
         proj = out_dir / "my_uart_test"
         assert (proj / "my_uart_test.syscfg").exists()
         assert (proj / "my_uart_test.c").exists()
-        assert (proj / "ticlang" / "device_linker.cmd").exists()
+        # CCS generates device_linker.cmd via SysConfig — scaffold no longer copies it
         assert (proj / "my_uart_test.projectspec").exists()
 
 
