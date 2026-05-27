@@ -1,4 +1,4 @@
-#include "mid_timer_stub.h"
+#include "mid_timer.h"
 static volatile uint32_t sys_tick_ms = 0;
 void timer_init(void) {
     NVIC_ClearPendingIRQ(TIMER_TICK_INST_INT_IRQN);

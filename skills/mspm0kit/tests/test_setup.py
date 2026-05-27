@@ -16,7 +16,8 @@ def test_config_json_written():
 
         try:
             with patch("builtins.input", side_effect=["", "", "", ""]):
-                setup.main()
+                cfg = setup.interactive_config()
+                setup.write_config(cfg)
 
             cfg_path = Path(tmp) / "config.json"
             assert cfg_path.exists()
@@ -39,7 +40,8 @@ def test_user_override():
         try:
             with patch("builtins.input",
                         side_effect=[r"C:\my\ccs", r"C:\my\sdk", "JLink", ""]):
-                setup.main()
+                cfg = setup.interactive_config()
+                setup.write_config(cfg)
 
             cfg = json.loads((Path(tmp) / "config.json").read_text(encoding="utf-8"))
             assert cfg["ccs_root"] == r"C:\my\ccs"

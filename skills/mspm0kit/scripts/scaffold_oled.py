@@ -12,24 +12,43 @@ def _load_config(config_path: str) -> dict:
         return json.load(f)
 
 def _find_source(source: str | None, config: dict) -> Path:
-    """Find OLED_UI source: explicit --source arg, then config.json, then fail."""
-    if source:
-        p = Path(source)
-        if p.is_dir() and (p / "oledUI" / "OLED.c").exists():
+    """Find OLED_UI source: explicit --source, then config.json, then search subdirs."""
+    def _check(p: Path) -> Path | None:
+        if not p.is_dir():
+            return None
+        if (p / "oledUI" / "OLED.c").exists():
             return p
+        # Search one level deep for CCS project dirs
+        for child in p.iterdir():
+            if child.is_dir() and (child / "oledUI" / "OLED.c").exists():
+                return child
+        return None
 
+    candidates = []
+    if source:
+        candidates.append(Path(source))
     cfg_path = config.get("oled_ui_source", "")
     if cfg_path:
-        p = Path(cfg_path)
-        if p.is_dir() and (p / "oledUI" / "OLED.c").exists():
-            return p
+        candidates.append(Path(cfg_path))
+    # Also try common repo root sub-paths
+    if cfg_path and not (Path(cfg_path) / "oledUI").exists():
+        for sub in ["OLED_UI_Examples/MSPM0G3519/ccs/oeldui",
+                     "OLED_UI_Examples/MSPM0G3507/ccs/oeldui"]:
+            candidates.append(Path(cfg_path) / sub)
+
+    for p in candidates:
+        result = _check(p)
+        if result:
+            return result
 
     raise FileNotFoundError(
-        "Cannot find OLED_UI repo.\n"
+        "Cannot find OLED_UI repo (must contain oledUI/OLED.c).\n"
         "Options:\n"
-        "  1. Run setup.py to configure the path\n"
+        "  1. Run setup.py to configure the CCS project path\n"
         "  2. Pass --source <path> to this script\n"
-        "  3. Clone from https://github.com/LaoGuaiGe/OLED_UI"
+        "  3. Clone from https://github.com/LaoGuaiGe/OLED_UI\n"
+        "Note: path must point to the CCS project dir (contains oledUI/OLED.c),\n"
+        "      not the repository root."
     )
 
 
@@ -38,8 +57,9 @@ def _find_source(source: str | None, config: dict) -> Path:
 APP_TASK_STUB_H = """\
 #ifndef APP_TASK_STUB_H
 #define APP_TASK_STUB_H
-#include "stdbool.h"
-#include "stdint.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 typedef enum {
     APP_STATE_IDLE,
     APP_STATE_FADE_IN,
@@ -86,8 +106,8 @@ int16_t  HW_Encoder_GetDelta(void){ return 0; }
 """
 
 MID_TIMER_STUB_H = """\
-#ifndef __MID_TIMER_STUB_H__
-#define __MID_TIMER_STUB_H__
+#ifndef __MID_TIMER_H__
+#define __MID_TIMER_H__
 #include "ti_msp_dl_config.h"
 #include "stdint.h"
 void     timer_init(void);
@@ -98,7 +118,7 @@ uint32_t get_sys_tick_ms(void);
 """
 
 MID_TIMER_STUB_C = """\
-#include "mid_timer_stub.h"
+#include "mid_timer.h"
 static volatile uint32_t sys_tick_ms = 0;
 void timer_init(void) {
     NVIC_ClearPendingIRQ(TIMER_TICK_INST_INT_IRQN);
@@ -121,12 +141,12 @@ SYSCFG_IMU_ADDON = """
 const GPIO2  = GPIO.addInstance();
 GPIO2.$name                          = "IMU";
 GPIO2.associatedPins.create(2);
-GPIO2.associatedPins[0].$name        = "SDA";
+GPIO2.associatedPins[0].$name        = "IMU_SDA";
 GPIO2.associatedPins[0].initialValue = "SET";
 GPIO2.associatedPins[0].assignedPort = "PORTA";
 GPIO2.associatedPins[0].assignedPin  = "28";
 GPIO2.associatedPins[0].pin.$assign  = "PA28";
-GPIO2.associatedPins[1].$name        = "SCL";
+GPIO2.associatedPins[1].$name        = "IMU_SCL";
 GPIO2.associatedPins[1].initialValue = "SET";
 GPIO2.associatedPins[1].assignedPort = "PORTA";
 GPIO2.associatedPins[1].assignedPin  = "27";
@@ -221,6 +241,27 @@ MenuPage MainMenuPage = {
 };
 """
 
+DRAW_MAIN_C = """\
+#include "ti_msp_dl_config.h"
+#include "OLED.h"
+
+int main(void)
+{
+    SYSCFG_DL_init();
+
+    OLED_Init();
+    OLED_Clear();
+    OLED_ShowString(0, 0, "TianQiaoXing", 12);
+    OLED_ShowString(0, 16, "MSPM0G3519 OLED", 12);
+    OLED_ShowString(0, 32, "Hello World!", 12);
+    OLED_Update();
+
+    while (1) {
+        /* Your drawing code here */
+    }
+}
+"""
+
 MAIN_C_TEMPLATE = """\
 #include "ti_msp_dl_config.h"
 #include "OLED_UI.h"
@@ -236,7 +277,7 @@ int main(void)
     OLED_ShowString(0, 0, "OLED UI Framework", 12);
     OLED_ShowString(0, 16, "TianQiaoXing G3519", 12);
     OLED_Update();
-    delay_cycles(16000000);  /* ~200ms at 80MHz */
+    delay_cycles(16000000);
 
     OLED_UI_Init(&MainMenuPage);
 
@@ -295,13 +336,13 @@ Board.peripheral.swdioPin.$assign = "PA19";
 /* ---- OLED I2C: PA0=SDA, PA1=SCL ---- */
 GPIO1.$name                              = "OLED";
 GPIO1.associatedPins.create(2);
-GPIO1.associatedPins[0].$name            = "SDA";
+GPIO1.associatedPins[0].$name            = "OLED_SDA";
 GPIO1.associatedPins[0].initialValue     = "SET";
 GPIO1.associatedPins[0].assignedPort     = "PORTA";
 GPIO1.associatedPins[0].assignedPin      = "0";
 GPIO1.associatedPins[0].ioStructure      = "OD";
 GPIO1.associatedPins[0].pin.$assign      = "PA0";
-GPIO1.associatedPins[1].$name            = "SCL";
+GPIO1.associatedPins[1].$name            = "OLED_SCL";
 GPIO1.associatedPins[1].initialValue     = "SET";
 GPIO1.associatedPins[1].assignedPort     = "PORTA";
 GPIO1.associatedPins[1].assignedPin      = "1";
@@ -371,12 +412,10 @@ PROJECTSPEC_TEMPLATE = """\
         <file path="oledUI/OLED.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
         <file path="oledUI/OLED_driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
         <file path="oledUI/OLED_Fonts.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="oledUI/OLED_UI.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="oledUI/OLED_UI_Driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="oledUI/OLED_UI_MenuData.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="oledUI/oled_ext_font.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
         <file path="hardware/myiic.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
         <file path="hardware/hw_delay.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
-        <file path="app/app_task_stub.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+{menu_file_entries}
 {extra_file_entries}
     </project>
 </projectSpec>
@@ -404,6 +443,7 @@ def main(
     output_dir: str | None = None,
     source: str | None = None,
     config_path: str | None = None,
+    mode: str = "draw",
     with_imu: bool = False,
     with_ws2812: bool = False,
     with_wireless: bool = False,
@@ -422,45 +462,47 @@ def main(
     for d in ["oledUI", "hardware", "app", "middle", "ticlang"]:
         (out / d).mkdir(exist_ok=True)
 
-    # ── 1. Copy as-is: core OLED files ──
-    for stem in ["OLED.c", "OLED.h", "OLED_driver.c", "OLED_driver.h",
-                  "OLED_Fonts.c", "OLED_Fonts.h", "OLED_UI.h", "OLED_UI_MenuData.h"]:
-        shutil.copy2(src_root / "oledUI" / stem, out / "oledUI" / stem)
+    is_menu = (mode == "menu")
 
-    # ── 2. Copy & trim: OLED_UI.c ──
-    _trim_file(
-        src_root / "oledUI" / "OLED_UI.c",
-        out / "oledUI" / "OLED_UI.c",
-        remove_includes=['#include "app_task.h"'],
-    )
+    # ── 1. Copy as-is: core OLED files (always) ──
+    core_stems = ["OLED.c", "OLED.h", "OLED_driver.c", "OLED_driver.h",
+                  "OLED_Fonts.c", "OLED_Fonts.h",
+                  "oled_ext_font.c", "oled_ext_font.h",
+                  "OLED_UI_Driver.h"]
+    for stem in core_stems:
+        src_file = src_root / "oledUI" / stem
+        if src_file.exists():
+            shutil.copy2(src_file, out / "oledUI" / stem)
 
-    # ── 3. Copy & trim: OLED_UI_Driver.c ──
-    _trim_file(
-        src_root / "oledUI" / "OLED_UI_Driver.c",
-        out / "oledUI" / "OLED_UI_Driver.c",
-        remove_includes=['#include "hw_encoder.h"'],
-    )
+    # Menu mode files
+    if is_menu:
+        shutil.copy2(src_root / "oledUI" / "OLED_UI.h", out / "oledUI" / "OLED_UI.h")
+        shutil.copy2(src_root / "oledUI" / "OLED_UI_MenuData.h", out / "oledUI" / "OLED_UI_MenuData.h")
+        _trim_file(
+            src_root / "oledUI" / "OLED_UI.c",
+            out / "oledUI" / "OLED_UI.c",
+            remove_includes=['#include "app_task.h"'],
+        )
+        _trim_file(
+            src_root / "oledUI" / "OLED_UI_Driver.c",
+            out / "oledUI" / "OLED_UI_Driver.c",
+            remove_includes=['#include "hw_encoder.h"'],
+        )
+        (out / "oledUI" / "OLED_UI_MenuData.c").write_text(MENU_DATA_C, encoding="utf-8")
+        (out / "app" / "app_task_stub.h").write_text(APP_TASK_STUB_H, encoding="utf-8")
+        (out / "app" / "app_task_stub.c").write_text(APP_TASK_STUB_C, encoding="utf-8")
+        (out / "hardware" / "hw_encoder_stub.h").write_text(HW_ENCODER_STUB_H, encoding="utf-8")
+        ui_c = (out / "oledUI" / "OLED_UI.c").read_text(encoding="utf-8")
+        ui_c = '#include "app_task_stub.h"\n' + ui_c
+        (out / "oledUI" / "OLED_UI.c").write_text(ui_c, encoding="utf-8")
 
-    # ── 4. Minimal MenuData ──
-    (out / "oledUI" / "OLED_UI_MenuData.c").write_text(MENU_DATA_C, encoding="utf-8")
-
-    # ── 5. Hardware deps ──
+    # ── 2. Hardware deps ──
     shutil.copy2(src_root / "hardware" / "myiic.c", out / "hardware" / "myiic.c")
     shutil.copy2(src_root / "hardware" / "myiic.h", out / "hardware" / "myiic.h")
     shutil.copy2(src_root / "hardware" / "hw_delay.c", out / "hardware" / "hw_delay.c")
     shutil.copy2(src_root / "hardware" / "hw_delay.h", out / "hardware" / "hw_delay.h")
 
-    # ── 6. Stub files ──
-    (out / "app" / "app_task_stub.h").write_text(APP_TASK_STUB_H, encoding="utf-8")
-    (out / "app" / "app_task_stub.c").write_text(APP_TASK_STUB_C, encoding="utf-8")
-    (out / "hardware" / "hw_encoder_stub.h").write_text(HW_ENCODER_STUB_H, encoding="utf-8")
-
-    # ── 7. Add #include "app_task_stub.h" to OLED_UI.c ──
-    ui_c = (out / "oledUI" / "OLED_UI.c").read_text(encoding="utf-8")
-    ui_c = '#include "app_task_stub.h"\n' + ui_c
-    (out / "oledUI" / "OLED_UI.c").write_text(ui_c, encoding="utf-8")
-
-    # ── 7b. Optional modules ──
+    # ── 3. Optional modules ──
 
     if with_imu:
         shutil.copy2(src_root / "hardware" / "hw_lsm6ds3.c", out / "hardware" / "hw_lsm6ds3.c")
@@ -489,13 +531,17 @@ def main(
         extra_files += '\n        <file path="middle/mid_wireless_uart.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
 
     if need_timer:
-        (out / "middle" / "mid_timer_stub.h").write_text(MID_TIMER_STUB_H, encoding="utf-8")
-        (out / "middle" / "mid_timer_stub.c").write_text(MID_TIMER_STUB_C, encoding="utf-8")
+        (out / "middle" / "mid_timer.h").write_text(MID_TIMER_STUB_H, encoding="utf-8")
+        (out / "middle" / "mid_timer.c").write_text(MID_TIMER_STUB_C, encoding="utf-8")
         syscfg_addon += SYSCFG_TIMER_ADDON
-        extra_files += '\n        <file path="middle/mid_timer_stub.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="middle/mid_timer.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
 
-    # ── 8. Generated files ──
-    (out / "main.c").write_text(MAIN_C_TEMPLATE, encoding="utf-8")
+    # ── 4. Generated files ──
+    if is_menu:
+        (out / "main.c").write_text(MAIN_C_TEMPLATE, encoding="utf-8")
+    else:
+        (out / "main.c").write_text(DRAW_MAIN_C, encoding="utf-8")
+
     syscfg_content = SYSCFG_TEMPLATE + syscfg_addon
     (out / f"{project_name}.syscfg").write_text(syscfg_content, encoding="utf-8")
 
@@ -510,9 +556,17 @@ def main(
             shutil.copy2(sdk_cmd, out / "ticlang" / "device_linker.cmd")
 
     # ── 10. projectspec ──
+    menu_files = ""
+    if is_menu:
+        menu_files = '\n        <file path="oledUI/OLED_UI.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="oledUI/OLED_UI_Driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="oledUI/OLED_UI_MenuData.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="app/app_task_stub.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+
     pspec = PROJECTSPEC_TEMPLATE.format(
         project_name=project_name,
         extra_file_entries=extra_files,
+        menu_file_entries=menu_files,
     )
     (out / f"{project_name}.projectspec").write_text(pspec, encoding="utf-8")
 
@@ -529,12 +583,15 @@ if __name__ == "__main__":
     p.add_argument("--with-imu", action="store_true", help="Add LSM6DS3 IMU driver + FusionAhrs")
     p.add_argument("--with-ws2812", action="store_true", help="Add WS2812 RGB LED driver + effects")
     p.add_argument("--with-wireless", action="store_true", help="Add wireless UART module (UART7)")
+    p.add_argument("--mode", default="draw", choices=["draw", "menu"],
+                   help="draw=basic OLED graphics only, menu=full UI with menu engine (default: draw)")
     args = p.parse_args()
 
     result = main(
         project_name=args.project_name,
         output_dir=args.output,
         source=args.source,
+        mode=args.mode,
         with_imu=args.with_imu,
         with_ws2812=args.with_ws2812,
         with_wireless=args.with_wireless,

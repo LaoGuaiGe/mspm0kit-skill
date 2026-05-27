@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 CONFIG_DIR = Path(__file__).resolve().parents[1]
@@ -21,7 +22,6 @@ DEFAULTS = {
 
 
 def _safe_prompt(label: str, default: str) -> str:
-    """Prompt with encoding-safe fallback for Windows terminals."""
     try:
         value = input(f"{label} [{default}]: ").strip()
     except (UnicodeEncodeError, UnicodeDecodeError):
@@ -30,38 +30,64 @@ def _safe_prompt(label: str, default: str) -> str:
     return value if value else default
 
 
-def main() -> None:
-    config_path = CONFIG_DIR / "config.json"
+def interactive_config() -> dict:
     print("mspm0kit Skill Setup")
     print("-" * 22)
-
     ccs_root = _safe_prompt("CCS install dir", DEFAULTS["ccs_root"])
     sdk_root = _safe_prompt("MSPM0 SDK dir", DEFAULTS["sdk_root"])
     probe = _safe_prompt("Debug probe (XDS110/JLink)", DEFAULTS["probe"])
     oled_ui = _safe_prompt(
-        "OLED_UI repo path (optional, leave empty to skip)",
+        "OLED_UI CCS project path (must contain oledUI/OLED.c, leave empty to skip)",
         DEFAULTS["oled_ui_source"],
     )
-
-    config = {
+    return {
         "ccs_root": ccs_root,
         "sdk_root": sdk_root,
         "sysconfig_cli": DEFAULTS["sysconfig_cli"],
         "dslite": DEFAULTS["dslite"],
         "gmake": DEFAULTS["gmake"],
         "compiler": DEFAULTS["compiler"],
-        "sdk_examples": str(
-            Path(sdk_root) / "examples/nortos/LP_MSPM0G3519/driverlib"
-        ),
+        "sdk_examples": str(Path(sdk_root) / "examples/nortos/LP_MSPM0G3519/driverlib"),
         "probe": probe,
         "oled_ui_source": oled_ui,
     }
 
+
+def write_config(config: dict) -> Path:
+    config_path = CONFIG_DIR / "config.json"
     config_path.write_text(
         json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    print(f"Config saved to: {config_path}")
+    return config_path
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    p = argparse.ArgumentParser(description="mspm0kit first-time setup")
+    p.add_argument("--accept-defaults", action="store_true",
+                   help="Skip prompts, use all defaults")
+    p.add_argument("--ccs-root", default=None)
+    p.add_argument("--sdk-root", default=None)
+    p.add_argument("--probe", default=None, choices=["XDS110", "JLink"])
+    p.add_argument("--oled-ui-source", default=None)
+    args = p.parse_args()
+
+    if args.accept_defaults or not sys.stdin.isatty():
+        config = {
+            "ccs_root": args.ccs_root or DEFAULTS["ccs_root"],
+            "sdk_root": args.sdk_root or DEFAULTS["sdk_root"],
+            "sysconfig_cli": DEFAULTS["sysconfig_cli"],
+            "dslite": DEFAULTS["dslite"],
+            "gmake": DEFAULTS["gmake"],
+            "compiler": DEFAULTS["compiler"],
+            "sdk_examples": str(Path(args.sdk_root or DEFAULTS["sdk_root"])
+                / "examples/nortos/LP_MSPM0G3519/driverlib"),
+            "probe": args.probe or DEFAULTS["probe"],
+            "oled_ui_source": args.oled_ui_source or DEFAULTS["oled_ui_source"],
+        }
+    else:
+        config = interactive_config()
+
+    path = write_config(config)
+    print(f"Config saved to: {path}")
