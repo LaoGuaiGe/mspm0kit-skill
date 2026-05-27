@@ -1,9 +1,9 @@
 ---
-name: tianqiaoxing-g3519
+name: mspm0kit
 description: One-sentence CCS project generator for the Tianqiaoxing MSPM0G3519 custom board. Create full CCS projects from SDK examples with automatic pin/package adaptation, then build and flash. Use when the user wants to start a new MSPM0 firmware project on this specific board, or needs pin availability information for the Tianqiaoxing G3519.
 ---
 
-# 天巧星 MSPM0G3519 Skill
+# mspm0kit — 天巧星 MSPM0G3519 Skill
 
 **Board**: Tianqiaoxing MSPM0G3519 custom development board (LQFP-64)
 **Toolchain**: CCS Theia + TI Arm Clang + SysConfig + DriverLib
@@ -64,6 +64,45 @@ Wait for confirmation before creating files, OR proceed if the user has indicate
 - If SysConfig emits warnings, report them — don't call it "clean".
 - If hardware behavior is unverified, say "verification stopped at compile level".
 - Every access to external paths (CCS, SDK) requires a permission prompt.
+
+## Project Layering
+
+Generated projects must follow the embedded code layering conventions from the OLED_UI reference project. If unsure about layer placement, ask the user.
+
+### Layer Structure
+
+```
+<project>/
+├── main.c                     # Entry point: init + main loop
+├── <project>.syscfg            # SysConfig: pins, clocks, peripherals
+├── app/                        # Application layer
+│   └── app_<feature>.c/h       # User-facing app tasks, game logic, UI pages
+├── hardware/                   # Hardware abstraction layer (HAL)
+│   └── hw_<peripheral>.c/h     # Peripheral drivers (I2C, SPI, PWM, sensors)
+├── middle/                     # Middleware layer
+│   └── mid_<service>.c/h       # Reusable system services (timer, button, protocol)
+└── ticlang/                    # Build output (generated)
+```
+
+### Layer Rules
+
+| Layer | Prefix | Responsibility | Depends on |
+|-------|--------|---------------|------------|
+| `hardware/` | `hw_` | Peripheral drivers, sensor drivers, bit-bang protocols | DriverLib, `ti_msp_dl_config.h` |
+| `middle/` | `mid_` | System services, protocol parsers, reusable components | `hardware/` or DriverLib |
+| `app/` | `app_` | Application tasks, UI pages, game logic | `hardware/` + `middle/` |
+
+### Key Conventions
+
+- **File naming**: `hw_<peripheral>.c`, `mid_<service>.c`, `app_<feature>.c` — prefix indicates layer
+- **No cross-layer back-references**: `hardware/` must not include `middle/` or `app/` headers. `middle/` must not include `app/` headers.
+- **SysConfig ownership**: only `main.c` calls `SYSCFG_DL_init()`. Peripheral drivers receive config via generated macros from `ti_msp_dl_config.h`.
+- **Single responsibility**: each `.c/.h` pair handles one peripheral or one service
+- **Simple projects**: if the project has less than 3 source files, keep everything in root — don't over-layer
+
+### Reference
+
+Full example: `E:\github\OLED_UI\OLED_UI_Examples\MSPM0G3519\ccs\oeldui` (hardware → middle → oledUI → app, 4-layer embedded architecture)
 
 ## Pin Table — Tianqiaoxing MSPM0G3519
 
