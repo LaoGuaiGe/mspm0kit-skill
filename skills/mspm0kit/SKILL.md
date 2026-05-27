@@ -164,7 +164,7 @@ If `config.json` does not exist, run `python scripts/setup.py` first.
 | Script | Purpose |
 |--------|---------|
 | `python scripts/setup.py` | First-time path configuration |
-| `python scripts/scaffold.py <name> <example> -o <dir>` | Generate CCS project from SDK example |
+| `python scripts/scaffold.py <name> <example> -o <dir>` | Generate CCS project (searches bundled examples first, then SDK) |
 | `python scripts/build.py <project_dir>` | SysConfig CLI + gmake compile |
 | `python scripts/flash.py <project_dir>` | DSLite flash |
 | `python scripts/serial_console.py <port> -b <baud>` | Serial monitor |
@@ -190,6 +190,16 @@ Key SDK examples (under `examples/nortos/LP_MSPM0G3519/driverlib/`):
 | PWM Timer | `timg_32bit_timer_mode_pwm_edge_sleep` | PB6, PB7 (TIMG12) |
 | Timer Periodic | `tima_timer_mode_periodic_repeat_count` | — |
 | QEI | `timg_qei_mode` | — |
+
+### Bundled Board Examples (no SDK dependency)
+
+These are self-contained in the skill's `examples/` directory. They do NOT require the OLED_UI repo or any external source.
+
+| Module | Example Name | Pins | Use |
+|--------|-------------|------|-----|
+| Wireless UART | `wireless_uart7` | PB17/PB18 | `scaffold.py <name> wireless_uart7` |
+| WS2812 RGB LED | `ws2812_rgb` | PB26 | `scaffold.py <name> ws2812_rgb` |
+| IMU LSM6DS3 | `imu_lsm6ds3` | PA27/PA28 | `scaffold.py <name> imu_lsm6ds3` |
 
 ### OLED UI Framework (from local repo)
 

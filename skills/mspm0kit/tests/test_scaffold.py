@@ -80,10 +80,11 @@ def test_scaffold_copies_files():
             _interactive=False,
         )
 
-        assert (out_dir / "my_uart_test.syscfg").exists()
-        assert (out_dir / "my_uart_test.c").exists()
-        assert (out_dir / "ticlang" / "device_linker.cmd").exists()
-        assert (out_dir / "my_uart_test.projectspec").exists()
+        proj = out_dir / "my_uart_test"
+        assert (proj / "my_uart_test.syscfg").exists()
+        assert (proj / "my_uart_test.c").exists()
+        assert (proj / "ticlang" / "device_linker.cmd").exists()
+        assert (proj / "my_uart_test.projectspec").exists()
 
 
 def test_scaffold_fixes_package():
@@ -104,7 +105,8 @@ def test_scaffold_fixes_package():
             _interactive=False,
         )
 
-        syscfg = (out_dir / "test_pkg.syscfg").read_text()
+        proj = out_dir / "test_pkg"
+        syscfg = (proj / "test_pkg.syscfg").read_text()
         assert 'LQFP-64(PM)' in syscfg
         assert 'LQFP-100(PZ)' not in syscfg
 
