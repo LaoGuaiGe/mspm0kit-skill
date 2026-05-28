@@ -15,6 +15,7 @@ SCAFFOLD = SKILL_DIR / "scripts" / "scaffold.py"
 IMU_C_FILES = ["hw_lsm6ds3.c", "FusionAhrs.c", "FusionOffset.c"]
 WS2812_C_FILES = ["hw_ws2812.c", "hw_ws2812_effects.c"]
 WIRELESS_C_FILES = ["mid_wireless_uart.c"]
+ENCODER_C_FILES = ["hw_encoder_qei.c"]
 TIMER_C_FILES = ["mid_timer.c"]
 
 # SysConfig addons
@@ -47,6 +48,28 @@ PWM_WS1.ccp0PinConfig.onlyInternalResistor = scripting.forceWrite(false);
 PWM_WS1.ccp0PinConfig.passedPeripheralType = scripting.forceWrite("Digital");
 PWM_WS1.PWM_CHANNEL_0.initVal = "HIGH";
 PWM_WS1.PWM_CHANNEL_0.shadowUpdateMode = "ZERO_EVT";
+"""
+
+SYSCFG_ENCODER = """
+/* QEI Encoder: TIMG8 on PA29(PHA)/PA30(PHB), SW button PA31 */
+const QEI_ENC = scripting.addModule("/ti/driverlib/QEI", {}, false);
+const QEI_ENC1 = QEI_ENC.addInstance();
+QEI_ENC1.$name = "QEI_ENCODER"; QEI_ENC1.peripheral.$assign = "TIMG8";
+QEI_ENC1.peripheral.ccp0Pin.$assign = "PA29"; QEI_ENC1.peripheral.ccp1Pin.$assign = "PA30";
+QEI_ENC1.ccp0PinConfig.hideOutputInversion = scripting.forceWrite(false);
+QEI_ENC1.ccp0PinConfig.onlyInternalResistor = scripting.forceWrite(false);
+QEI_ENC1.ccp0PinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+QEI_ENC1.ccp1PinConfig.hideOutputInversion = scripting.forceWrite(false);
+QEI_ENC1.ccp1PinConfig.onlyInternalResistor = scripting.forceWrite(false);
+QEI_ENC1.ccp1PinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+const GPIO_ENC = GPIO.addInstance();
+GPIO_ENC.$name = "ENC_SW";
+GPIO_ENC.associatedPins[0].$name = "SW";
+GPIO_ENC.associatedPins[0].direction = "INPUT";
+GPIO_ENC.associatedPins[0].internalResistor = "PULL_UP";
+GPIO_ENC.associatedPins[0].assignedPort = "PORTA";
+GPIO_ENC.associatedPins[0].assignedPin = "31";
+GPIO_ENC.associatedPins[0].pin.$assign = "PA31";
 """
 
 SYSCFG_WIRELESS = """
@@ -97,6 +120,7 @@ def main(
     with_imu: bool = False,
     with_ws2812: bool = False,
     with_wireless: bool = False,
+    with_encoder: bool = False,
 ) -> Path:
     example_name = "oled_menu" if mode == "menu" else "oled_draw"
 
@@ -129,6 +153,10 @@ def main(
     if with_wireless:
         extra_entries += _copy_bundled_driver(out, WIRELESS_C_FILES, out)
         syscfg_addon += SYSCFG_WIRELESS
+    if with_encoder:
+        extra_entries += _copy_bundled_driver(out, ENCODER_C_FILES, out)
+        syscfg_addon += SYSCFG_ENCODER
+        need_timer = True  # encoder needs 5ms tick
     if need_timer:
         extra_entries += _copy_bundled_driver(out, TIMER_C_FILES, out)
         syscfg_addon += SYSCFG_TIMER
@@ -163,6 +191,7 @@ if __name__ == "__main__":
     p.add_argument("--with-imu", action="store_true")
     p.add_argument("--with-ws2812", action="store_true")
     p.add_argument("--with-wireless", action="store_true")
+    p.add_argument("--with-encoder", action="store_true")
     args = p.parse_args()
 
     result = main(
@@ -173,12 +202,14 @@ if __name__ == "__main__":
         with_imu=args.with_imu,
         with_ws2812=args.with_ws2812,
         with_wireless=args.with_wireless,
+        with_encoder=args.with_encoder,
     )
 
     modules = []
     if args.with_imu: modules.append("IMU")
     if args.with_ws2812: modules.append("WS2812")
     if args.with_wireless: modules.append("Wireless")
+    if args.with_encoder: modules.append("Encoder")
     i2c_note = " (hardware I2C)" if args.i2c == "hw" else ""
 
     print(f"OLED UI project ({args.mode}{i2c_note}): {result}")

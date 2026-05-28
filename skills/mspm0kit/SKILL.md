@@ -261,6 +261,7 @@ These are self-contained in the skill's `examples/` directory. They do NOT requi
 | Wireless UART | `wireless_uart7` | PB17/PB18 | `scaffold.py <name> wireless_uart7` |
 | WS2812 RGB LED | `ws2812_rgb` | PB26 | `scaffold.py <name> ws2812_rgb` |
 | IMU LSM6DS3 | `imu_lsm6ds3` | PA27/PA28 | `scaffold.py <name> imu_lsm6ds3` |
+| QEI Encoder | `encoder_qei` | PA29/PA30/PA31 | `scaffold.py <name> encoder_qei` or `--with-encoder` |
 
 ### OLED UI Framework (bundled, no external dependencies)
 
