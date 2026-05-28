@@ -491,13 +491,13 @@ Board.peripheral.swdioPin.$assign = "PA19";
 /* ---- Software I2C: PA0=SDA, PA1=SCL (shared by OLED + IMU, bit-bang GPIO) ---- */
 GPIO1.$name                              = "OLED";
 GPIO1.associatedPins.create(2);
-GPIO1.associatedPins[0].$name            = "OLED_SDA";
+GPIO1.associatedPins[0].$name            = "SDA";
 GPIO1.associatedPins[0].initialValue     = "SET";
 GPIO1.associatedPins[0].assignedPort     = "PORTA";
 GPIO1.associatedPins[0].assignedPin      = "0";
 GPIO1.associatedPins[0].ioStructure      = "OD";
 GPIO1.associatedPins[0].pin.$assign      = "PA0";
-GPIO1.associatedPins[1].$name            = "OLED_SCL";
+GPIO1.associatedPins[1].$name            = "SCL";
 GPIO1.associatedPins[1].initialValue     = "SET";
 GPIO1.associatedPins[1].assignedPort     = "PORTA";
 GPIO1.associatedPins[1].assignedPin      = "1";

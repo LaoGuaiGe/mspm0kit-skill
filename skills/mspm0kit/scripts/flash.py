@@ -30,12 +30,17 @@ def main(project_dir: str, config_path: str | None = None) -> None:
     else:
         ccxml_path = ccxml[0]
 
+    # Clean board data cache (stale data causes "invalid processor ID")
+    import os
+    cache = Path(os.environ.get("LOCALAPPDATA", "")) / "Texas Instruments" / "CCS" / "CCS" / "0" / "1" / "BrdDat"
+    if cache.exists():
+        for f in cache.glob("ccBoard*.dat"):
+            f.unlink()
+            print(f"[cache] removed: {f}")
+
     dslite = config.get("dslite", "DSLite.exe")
-    cmd = [
-        dslite, "-c", str(ccxml_path),
-        "-e", "-r", "2",
-        "-u", str(out_file),
-    ]
+    # DSLite 20.x syntax: `DSLite flash -c <ccxml> <firmware>`
+    cmd = [dslite, "flash", "-c", str(ccxml_path), str(out_file)]
 
     print(f"Flashing: {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=False, text=True)
@@ -65,6 +70,9 @@ def _write_default_ccxml(path: Path, probe: str) -> None:
                   href="{conn_xml}" id="{conn_name}"
                   xml="{conn_xml.rsplit('/', 1)[-1]}" xmlpath="connections"/>
         <connection XML_version="1.2" id="{conn_name}">
+            <property Type="choicelist" Value="1" id="SWD Mode Settings">
+                <choice Name="SWD Mode - Aux COM port is target TDO pin" value="nothing"/>
+            </property>
             <platform XML_version="1.2" id="platform_0">
                 <instance XML_version="1.2" desc="MSPM0G3519"
                           href="devices/MSPM0G3519.xml" id="MSPM0G3519"

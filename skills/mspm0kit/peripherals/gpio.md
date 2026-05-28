@@ -37,3 +37,33 @@ PA3, PA4, PA7–PA9, PA12–PA17, PA21–PA26
 PB0–PB5, PB10–PB16, PB19, PB20, PB24, PB25, PB28
 
 (Excludes any pin listed as occupied in SKILL.md)
+
+## SysConfig JS Snippet
+
+### Output (LED, active-low)
+
+```js
+GPIO1.$name                         = "LED";
+GPIO1.associatedPins[0].$name       = "LED";
+GPIO1.associatedPins[0].assignedPort = "PORTB";
+GPIO1.associatedPins[0].assignedPin  = "22";
+GPIO1.associatedPins[0].pin.$assign  = "PB22";
+```
+
+### Input (button, pull-up)
+
+```js
+GPIO1.$name                              = "BTN";
+GPIO1.associatedPins[0].$name            = "ENTER";
+GPIO1.associatedPins[0].direction        = "INPUT";
+GPIO1.associatedPins[0].internalResistor = "PULL_UP";
+GPIO1.associatedPins[0].assignedPort     = "PORTB";
+GPIO1.associatedPins[0].assignedPin      = "21";
+GPIO1.associatedPins[0].pin.$assign      = "PB21";
+```
+
+### Cross-Port GPIO Instance
+
+When one GPIO instance has pins on different ports (e.g. PA18 + PB21), each pin gets its own `_PORT` macro:
+- `BTN_ENTER_PORT` → GPIOA (for PA18)
+- Don't use a single `BTN_PORT` for all pins — it doesn't exist. Use `GPIOA`/`GPIOB` directly.
