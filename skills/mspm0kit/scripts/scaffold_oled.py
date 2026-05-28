@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -20,13 +19,6 @@ ENCODER_C_FILES = ["hw_encoder_qei.c"]
 TIMER_C_FILES = ["mid_timer.c"]
 
 # SysConfig addons
-SYSCFG_HW_I2C = """
-const I2C  = scripting.addModule("/ti/driverlib/I2C", {}, false);
-const I2C1 = I2C.addInstance();
-I2C1.$name = "I2C_0"; I2C1.peripheral.$assign = "I2C0";
-I2C1.peripheral.sdaPin.$assign = "PA0"; I2C1.peripheral.sclPin.$assign = "PA1";
-"""
-
 SYSCFG_TIMER = """
 const TIMER  = scripting.addModule("/ti/driverlib/TIMER", {}, false);
 const TIMER1 = TIMER.addInstance();
@@ -189,18 +181,6 @@ def main(
     # 3. Modify syscfg
     syscfg_file = out / f"{project_name}.syscfg"
     content = syscfg_file.read_text(encoding="utf-8")
-
-    if not use_hw_i2c:
-        # Software I2C: remove I2C peripheral, add GPIO pin assignments
-        content = re.sub(
-            r'/\* ---- I2C0:.*?\*/\nconst I2C.*?I2C1\.peripheral\.sclPin\.\$assign = "PA1";\n',
-            '/* ---- Software I2C: PA0=SDA, PA1=SCL ---- */\n', content, flags=re.DOTALL)
-        content = content.replace(
-            'GPIO1.associatedPins[0].assignedPin = "0";',
-            'GPIO1.associatedPins[0].assignedPin = "0";\nGPIO1.associatedPins[0].initialValue = "SET";\nGPIO1.associatedPins[0].ioStructure = "OD";\nGPIO1.associatedPins[0].pin.$assign = "PA0";')
-        content = content.replace(
-            'GPIO1.associatedPins[1].assignedPin = "1";',
-            'GPIO1.associatedPins[1].assignedPin = "1";\nGPIO1.associatedPins[1].initialValue = "SET";\nGPIO1.associatedPins[1].ioStructure = "OD";\nGPIO1.associatedPins[1].pin.$assign = "PA1";')
 
     if syscfg_addon:
         content += syscfg_addon

@@ -68,7 +68,7 @@ static bool OLED_LastDisplayValid = false;
 #define OLED_HW_I2C_ADDR           0x3CU
 
 /* I2C 外设输入时钟频率 */
-#define OLED_HW_I2C_BUSCLK_HZ      40000000U
+#define OLED_HW_I2C_BUSCLK_HZ      CPUCLK_FREQ
 
 /* I2C 通信速率，当前稳定值 400kHz */
 #define OLED_HW_I2C_SPEED_HZ       400000U

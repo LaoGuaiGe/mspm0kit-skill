@@ -40,7 +40,7 @@ def _generate_makefile(ticlang_dir: Path, proj: Path, config: dict) -> None:
                 rel = d.relative_to(proj)
                 include_dirs.add(str(rel))
 
-    inc_flags = " ".join(f"-I../{d}" for d in sorted(include_dirs))
+    inc_flags = " ".join(f"-I../{d}" for d in sorted(include_dirs)).replace("\\", "/")
 
     c_files = [str(f).replace("\\", "/") for f in c_files_rel]
 
@@ -66,11 +66,11 @@ TICLANG_ARMCOMPILER    = {compiler_bin}
 CC   = "${{TICLANG_ARMCOMPILER}}/tiarmclang"
 LNK  = "${{TICLANG_ARMCOMPILER}}/tiarmclang"
 
-CFLAGS = -I.. -I. @INCLUDE_DIRS@ \\
+CFLAGS = -I.. -I. {inc_flags} \\
     -I"${{MSPM0_SDK_INSTALL_DIR}}/source/third_party/CMSIS/Core/Include" \\
     -I"${{MSPM0_SDK_INSTALL_DIR}}/source" \\
     -D__MSPM0G3519__ -gdwarf-3 -mcpu=cortex-m0plus -march=thumbv6m \\
-    -mfloat-abi=soft -mthumb -O2
+    -mfloat-abi=soft -mlittle-endian -mthumb -O1
 
 LFLAGS = -Wl,--rom_model -Wl,--warn_sections \\
     -L"${{MSPM0_SDK_INSTALL_DIR}}/source" \\

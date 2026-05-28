@@ -10,8 +10,8 @@ int main(void)
 
     OLED_Init();
     OLED_Clear();
-    OLED_ShowString(0, 0, "OLED UI Framework", 12);
-    OLED_ShowString(0, 16, "TianQiaoXing G3519", 12);
+    OLED_ShowString(0, 0, "OLED UI Framework", OLED_8X16_HALF);  // ASCII 8x16 half-width
+    OLED_ShowString(0, 16, "TianQiaoXing G3519", OLED_8X16_HALF);  // ASCII 8x16 half-width
     OLED_Update();
     delay_cycles(16000000);
 

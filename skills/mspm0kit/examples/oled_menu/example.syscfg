@@ -38,23 +38,19 @@ Board.peripheral.$assign = "DEBUGSS";
 Board.peripheral.swclkPin.$assign = "PA20";
 Board.peripheral.swdioPin.$assign = "PA19";
 
-/* ---- I2C0: PA0=SDA, PA1=SCL (hardware I2C, OLED + IMU shared bus) ---- */
-const I2C  = scripting.addModule("/ti/driverlib/I2C", {}, false);
-const I2C1 = I2C.addInstance();
-I2C1.$name = "I2C_0";
-I2C1.peripheral.$assign = "I2C0";
-I2C1.peripheral.sdaPin.$assign = "PA0";
-I2C1.peripheral.sclPin.$assign = "PA1";
-
-/* GPIO definitions for IOMUX macros (used by OLED_driver.c) */
+/* ---- OLED I2C: PA0=SDA, PA1=SCL (GPIO only; I2C0 init by OLED_driver.c) ---- */
 GPIO1.$name = "OLED";
 GPIO1.associatedPins.create(2);
 GPIO1.associatedPins[0].$name = "SDA";
+GPIO1.associatedPins[0].initialValue = "SET";
 GPIO1.associatedPins[0].assignedPort = "PORTA";
 GPIO1.associatedPins[0].assignedPin = "0";
+GPIO1.associatedPins[0].ioStructure = "OD";
 GPIO1.associatedPins[1].$name = "SCL";
+GPIO1.associatedPins[1].initialValue = "SET";
 GPIO1.associatedPins[1].assignedPort = "PORTA";
 GPIO1.associatedPins[1].assignedPin = "1";
+GPIO1.associatedPins[1].ioStructure = "OD";
 
 const ProjectConfig = scripting.addModule("/ti/project_config/ProjectConfig", {}, false);
 ProjectConfig.migrationCondition = true;
