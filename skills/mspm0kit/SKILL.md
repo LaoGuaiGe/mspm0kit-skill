@@ -49,15 +49,17 @@ Wait for confirmation before creating files, OR proceed if the user has indicate
 
 ### Step 4 — Verify
 
-0. **Before building, verify project structure (MANDATORY):**
+0. **MANDATORY: Run cleanup before building (every time):**
    ```bash
-   # Check NO .c files in subdirectories (CCS flat requirement)
-   find <project_dir> -path "*/Debug" -prune -o -path "*/ticlang" -prune -o -name "*.c" -print | grep "/"
-   # Must return NOTHING. If anything printed, move those .c to root and delete from subdir.
-   # Check NO generated files in root
-   ls <project_dir>/ti_msp_dl_config.* <project_dir>/device_linker.cmd <project_dir>/device.opt <project_dir>/device.cmd.genlibs 2>/dev/null
-   # Must return "No such file". If found, delete them (they belong in Debug/).
+   python scripts/cleanup.py <project_dir>
    ```
+   This automatically:
+   - Moves .c files from subdirectories to root (CCS flat rule)
+   - Deletes duplicate .c files
+   - Removes generated files from root (device_linker.cmd, ti_msp_dl_config.*, etc.)
+   - Removes ticlang/ directory (conflicts with CCS Debug/)
+   **Build MUST NOT proceed until cleanup returns success.**
+
 1. Run build:
    ```
    python scripts/build.py <project_dir>
@@ -224,6 +226,7 @@ If `config.json` does not exist, run `python scripts/setup.py` first.
 | `python scripts/build.py <project_dir>` | SysConfig CLI + gmake compile |
 | `python scripts/flash.py <project_dir>` | DSLite flash |
 | `python scripts/serial_console.py <port> -b <baud>` | Serial monitor |
+| `python scripts/cleanup.py <project_dir>` | **MANDATORY before build**: fix .c in subdirs, remove generated files from root |
 | `python scripts/scaffold_oled.py <name>` | Generate OLED UI framework project (from local OLED_UI repo) |
 
 ## SDK Example Index
