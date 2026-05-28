@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -189,18 +190,17 @@ def main(
     syscfg_file = out / f"{project_name}.syscfg"
     content = syscfg_file.read_text(encoding="utf-8")
 
-    if use_hw_i2c:
-        syscfg_addon += SYSCFG_HW_I2C
-        # Remove GPIO pin.$assign to avoid conflict with I2C peripheral on same pins
-        import re
+    if not use_hw_i2c:
+        # Software I2C: remove I2C peripheral, add GPIO pin assignments
         content = re.sub(
-            r'GPIO1\.associatedPins\[0\]\.pin\.\$assign\s*=\s*"PA0";',
-            '// GPIO1.associatedPins[0].pin.$assign = "PA0"; // released for HW I2C',
-            content)
-        content = re.sub(
-            r'GPIO1\.associatedPins\[1\]\.pin\.\$assign\s*=\s*"PA1";',
-            '// GPIO1.associatedPins[1].pin.$assign = "PA1"; // released for HW I2C',
-            content)
+            r'/\* ---- I2C0:.*?\*/\nconst I2C.*?I2C1\.peripheral\.sclPin\.\$assign = "PA1";\n',
+            '/* ---- Software I2C: PA0=SDA, PA1=SCL ---- */\n', content, flags=re.DOTALL)
+        content = content.replace(
+            'GPIO1.associatedPins[0].assignedPin = "0";',
+            'GPIO1.associatedPins[0].assignedPin = "0";\nGPIO1.associatedPins[0].initialValue = "SET";\nGPIO1.associatedPins[0].ioStructure = "OD";\nGPIO1.associatedPins[0].pin.$assign = "PA0";')
+        content = content.replace(
+            'GPIO1.associatedPins[1].assignedPin = "1";',
+            'GPIO1.associatedPins[1].assignedPin = "1";\nGPIO1.associatedPins[1].initialValue = "SET";\nGPIO1.associatedPins[1].ioStructure = "OD";\nGPIO1.associatedPins[1].pin.$assign = "PA1";')
 
     if syscfg_addon:
         content += syscfg_addon
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     p.add_argument("project_name", help="Project name")
     p.add_argument("-o", "--output", default=None)
     p.add_argument("--mode", default="draw", choices=["draw", "menu"])
-    p.add_argument("--i2c", default="sw", choices=["sw", "hw"])
+    p.add_argument("--i2c", default="hw", choices=["sw", "hw"])
     p.add_argument("--with-imu", action="store_true")
     p.add_argument("--with-ws2812", action="store_true")
     p.add_argument("--with-wireless", action="store_true")
