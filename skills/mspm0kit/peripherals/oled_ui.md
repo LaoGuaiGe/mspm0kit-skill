@@ -78,6 +78,25 @@ void OLED_UI_Back(void);           // navigate back
 void OLED_UI_CreateWindow(MenuWindow *win);
 ```
 
+## Font Reference
+
+| OLED_UI Macro | ASCII Font Macro | Pixel Size | Type |
+|--------------|-----------------|------------|------|
+| `OLED_UI_FONT_8` | `OLED_6X8_HALF` | 6×8 | ASCII half-width |
+| `OLED_UI_FONT_12` | `OLED_7X12_HALF` | 7×12 | ASCII half-width |
+| `OLED_UI_FONT_16` | `OLED_8X16_HALF` | 8×16 | ASCII half-width |
+| `OLED_UI_FONT_20` | `OLED_10X20_HALF` | 10×20 | ASCII half-width |
+| — | `OLED_12X12_FULL` | 12×12 | Chinese full-width |
+| — | `OLED_16X16_FULL` | 16×16 | Chinese full-width |
+| — | `OLED_20X20_FULL` | 20×20 | Chinese full-width |
+
+**Key rule**: ASCII text (English, numbers, symbols) MUST use `OLED_*_HALF` fonts. Chinese text uses `OLED_*_FULL` fonts. Using a Chinese font for ASCII strings renders nothing — the font lookup fails because ASCII chars have no bitmap in full-width font arrays.
+
+Key timing notes:
+- `OLED_UI_InterruptHandler()` runs at 20ms intervals (configurable)
+- Button/key events must last ≥ 20ms to be detected — use a hold counter of 4+ ticks (20ms at 5ms tick)
+- Use `OLED_ClearArea()` + `OLED_UpdateArea()` for partial refresh (much faster than full-screen)
+
 ## Minimal Example
 
 ```c

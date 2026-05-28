@@ -149,6 +149,22 @@ def main(
     startup_in_root = proj / startup_name
     if startup_in_ticlang.exists() and not startup_in_root.exists():
         shutil.copy2(startup_in_ticlang, startup_in_root)
+    # Patch startup file: add missing UART7_IRQHandler (SDK bug in ticlang startup)
+    startup_file = startup_in_root if startup_in_root.exists() else (startup_in_ticlang if startup_in_ticlang.exists() else None)
+    if startup_file and startup_file.exists():
+        content = startup_file.read_text(encoding="utf-8")
+        if "UART7_IRQHandler" not in content:
+            content = content.replace(
+                "void Default_Handler(void)",
+                "void UART7_IRQHandler(void) __attribute__((weak, alias(\"Default_Handler\")));\nvoid Default_Handler(void)")
+            # Find the vector table entry for position 27 (UART7) and replace 0 with handler
+            # The vector table is an array; UART7 is at index 27 (0-indexed after the initial SP)
+            import re
+            vector_pattern = r"(TIMA1_IRQHandler,\s*\n\s*)0,\s*// Index 28"
+            content = re.sub(vector_pattern, r"\1UART7_IRQHandler,  // Index 28 (UART7)", content)
+            if "UART7_IRQHandler" in content:
+                startup_file.write_text(content, encoding="utf-8")
+                print("[patch] added UART7_IRQHandler to startup file")
 
     # Step 2: Ensure ticlang/ and makefile exist (SysConfig may create ticlang/ but no makefile)
     ticlang_dir = proj / "ticlang"

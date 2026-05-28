@@ -1,6 +1,6 @@
 #include "OLED_UI_Driver.h"
 #include "hw_delay.h"
-
+#include "hw_encoder.h"
 /*
 【文件说明】：[硬件抽象层]
 此文件包含按键与编码器的驱动程序，如果需要移植此项目，请根据实际情况修改相关代码。
