@@ -2,6 +2,7 @@
 """Clean up a CCS project before building — fix common AI-generated mistakes."""
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 
@@ -13,30 +14,24 @@ def main(project_dir: str) -> int:
         return 1
 
     fixed = 0
+    skip_dirs = {"Debug", "ticlang", "targetConfigs", ".settings", ".git"}
 
-    # 1. Move .c files from subdirectories to root, remove duplicates
-    c_in_subdirs = []
+    # 1. Remove duplicate .c files between root and subdirectories
+    #    (AI sometimes puts a copy in root by mistake; keep the subdir version)
+    root_c_files = {f.name for f in proj.glob("*.c")}
     for d in proj.iterdir():
-        if not d.is_dir() or d.name in ("Debug", "ticlang", "targetConfigs"):
+        if not d.is_dir() or d.name in skip_dirs:
             continue
-        for cf in d.glob("*.c"):
-            c_in_subdirs.append(cf)
-
-    for cf in c_in_subdirs:
-        root_file = proj / cf.name
-        if root_file.exists():
-            # Compare: if same content, delete subdir copy; if different, keep root
-            if cf.read_text() == root_file.read_text():
-                cf.unlink()
-                print(f"[dup] removed: {cf.relative_to(proj)} (same as root)")
-                fixed += 1
-            else:
-                print(f"[warn] {cf.relative_to(proj)} differs from root — keeping both, review manually")
-        else:
-            # Move to root
-            cf.rename(root_file)
-            print(f"[move] {cf.relative_to(proj)} -> {root_file.name}")
-            fixed += 1
+        for cf in d.rglob("*.c"):
+            if cf.name in root_c_files:
+                root_dup = proj / cf.name
+                if root_dup.exists():
+                    if root_dup.read_text() == cf.read_text():
+                        root_dup.unlink()
+                        print(f"[dup] removed root/{cf.name} (keep {cf.relative_to(proj)})")
+                        fixed += 1
+                    else:
+                        print(f"[warn] root/{cf.name} differs from {cf.relative_to(proj)} — review manually")
 
     # 2. Remove generated files that belong in Debug/
     for name in ["device_linker.cmd", "device.cmd.genlibs", "device.opt",
@@ -44,35 +39,30 @@ def main(project_dir: str) -> int:
         gen_file = proj / name
         if gen_file.exists():
             gen_file.unlink()
-            print(f"[gen] removed root/{name} (CCS generates in Debug/)")
+            print(f"[gen] removed root/{name}")
             fixed += 1
 
-    # 3. Remove ticlang/ directory (CCS uses Debug/)
+    # 3. Remove ticlang/ directory (conflicts with CCS Debug/)
     ticlang = proj / "ticlang"
     if ticlang.is_dir():
-        import shutil
         shutil.rmtree(ticlang)
-        print("[dir] removed ticlang/ (conflicts with CCS Debug/)")
+        print("[dir] removed ticlang/")
         fixed += 1
 
-    # 4. Verify final state
-    remaining = []
-    for d in proj.iterdir():
-        if not d.is_dir() or d.name in ("Debug", "ticlang", "targetConfigs", ".settings", ".git"):
-            continue
-        for cf in d.glob("*.c"):
-            remaining.append(str(cf.relative_to(proj)))
-    if remaining:
-        print(f"[FAIL] .c files still in subdirectories: {remaining}")
-        return 1
+    # 4. Remove leftover src/ directory (from old flat-structure scaffold)
+    src_dir = proj / "src"
+    if src_dir.is_dir():
+        shutil.rmtree(src_dir)
+        print("[dir] removed src/ (old flat structure)")
+        fixed += 1
 
-    print(f"Cleanup complete: {fixed} issue(s) fixed, 0 remaining")
+    print(f"Cleanup complete: {fixed} issue(s) fixed")
     return 0
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python cleanup.py <project_dir>")
-        print("Fixes: duplicate .c, generated files in root, ticlang/ conflicts")
+        print("Fixes: duplicate .c, generated files in root, ticlang/, src/ leftovers")
         sys.exit(1)
     sys.exit(main(sys.argv[1]))
