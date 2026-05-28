@@ -70,7 +70,15 @@ def _write_default_ccxml(path: Path, probe: str) -> None:
                   href="{conn_xml}" id="{conn_name}"
                   xml="{conn_xml.rsplit('/', 1)[-1]}" xmlpath="connections"/>
         <connection XML_version="1.2" id="{conn_name}">
-            <property Type="choicelist" Value="1" id="SWD Mode Settings">
+            <instance XML_version="1.2" href="drivers/tixds510cs_dap.xml" id="drivers" xml="tixds510cs_dap.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds510cortexM0.xml" id="drivers" xml="tixds510cortexM0.xml" xmlpath="drivers"/>
+            <instance XML_version="1.2" href="drivers/tixds510sec_ap.xml" id="drivers" xml="tixds510sec_ap.xml" xmlpath="drivers"/>
+            <property Type="choicelist" Value="1" id="The JTAG TCLK Frequency (MHz)">
+                <choice Name="Fixed with user specified value" value="SPECIFIC">
+                    <property Type="stringfield" Value="1MHz" id="-- Enter a value from 100.0kHz to 2.5MHz"/>
+                </choice>
+            </property>
+            <property Type="choicelist" Value="2" id="SWD Mode Settings">
                 <choice Name="SWD Mode - Aux COM port is target TDO pin" value="nothing"/>
             </property>
             <platform XML_version="1.2" id="platform_0">

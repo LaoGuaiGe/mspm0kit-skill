@@ -49,6 +49,14 @@ def interactive_config() -> dict:
 
 def write_config(config: dict) -> Path:
     config_path = CONFIG_DIR / "config.json"
+    # Merge with existing config: keep any fields we don't know about
+    if config_path.exists():
+        try:
+            existing = json.loads(config_path.read_text(encoding="utf-8"))
+            merged = {**existing, **config}  # new values take priority
+            config = merged
+        except (json.JSONDecodeError, OSError):
+            pass
     config_path.write_text(
         json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8"
     )
