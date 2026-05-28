@@ -49,6 +49,15 @@ Wait for confirmation before creating files, OR proceed if the user has indicate
 
 ### Step 4 — Verify
 
+0. **Before building, verify project structure (MANDATORY):**
+   ```bash
+   # Check NO .c files in subdirectories (CCS flat requirement)
+   find <project_dir> -path "*/Debug" -prune -o -path "*/ticlang" -prune -o -name "*.c" -print | grep "/"
+   # Must return NOTHING. If anything printed, move those .c to root and delete from subdir.
+   # Check NO generated files in root
+   ls <project_dir>/ti_msp_dl_config.* <project_dir>/device_linker.cmd <project_dir>/device.opt <project_dir>/device.cmd.genlibs 2>/dev/null
+   # Must return "No such file". If found, delete them (they belong in Debug/).
+   ```
 1. Run build:
    ```
    python scripts/build.py <project_dir>
@@ -60,52 +69,97 @@ Wait for confirmation before creating files, OR proceed if the user has indicate
 
 ## Core Rules
 
+### R0: CCS FLAT C-FILE RULE (HIGHEST PRIORITY)
+
+**ALL `.c` source files MUST be placed directly in the project root directory. NEVER put `.c` files in subdirectories.**
+
+CCS compiles every `.c` it finds recursively. If the same file appears in both root and a subdirectory (e.g. `app/buttons.c` AND `buttons.c`), CCS compiles it twice → 100+ "symbol redefined" linker errors.
+
+```
+WRONG (will cause linker errors):
+  ├── app/
+  │   └── app_cube.c        ← CCS finds this
+  └── app_cube.c             ← CCS finds this too = DUPLICATE
+
+CORRECT:
+  ├── app_cube.c             ← all .c in root
+  ├── app/                   ← only .h files
+  │   └── app_cube.h
+```
+
+**Before reporting a project as complete, verify:**
+```bash
+# Should return NOTHING (no .c in subdirectories)
+find <project> -path "*/Debug" -prune -o -path "*/ticlang" -prune -o -path "*/.git" -prune -o -name "*.c" -print | grep -v "^<project>/[^/]*\.c$"
+```
+
+### R1: Generated Files
+
+- **Never edit** generated files: `ti_msp_dl_config.c`, `ti_msp_dl_config.h`.
+- **Never create** `device_linker.cmd`, `device.cmd.genlibs`, `device.opt` — CCS auto-generates them in `Debug/`.
+- **Never create** a `ticlang/` directory — it conflicts with CCS's `Debug/` build system.
+- If CCS left stale generated files in root after a failed import, delete them before building.
+
+### R2: SysConfig is the Source of Truth
+
 - `.syscfg` is the sole source of truth for pins, peripherals, clocks, interrupts, and DMA.
 - Prefer SysConfig + DriverLib over register-level code.
-- Never edit generated files: `ti_msp_dl_config.c`, `ti_msp_dl_config.h`, `device_linker.cmd`.
 - Don't guess generated macro names. Read the generated header after SysConfig runs.
 - If SysConfig emits warnings, report them — don't call it "clean".
 - If hardware behavior is unverified, say "verification stopped at compile level".
+
+### R3: External Path Permission
+
 - Every access to external paths (CCS, SDK) requires a permission prompt.
 
 ## Project Layering
 
-Generated projects must follow the embedded code layering conventions from the OLED_UI reference project. If unsure about layer placement, ask the user.
-
-### Layer Structure
+### File Organization (CCS-Compatible)
 
 ```
 <project>/
 ├── main.c                     # Entry point: init + main loop
 ├── <project>.syscfg            # SysConfig: pins, clocks, peripherals
-├── app/                        # Application layer
-│   └── app_<feature>.c/h       # User-facing app tasks, game logic, UI pages
-├── hardware/                   # Hardware abstraction layer (HAL)
-│   └── hw_<peripheral>.c/h     # Peripheral drivers (I2C, SPI, PWM, sensors)
-├── middle/                     # Middleware layer
-│   └── mid_<service>.c/h       # Reusable system services (timer, button, protocol)
-└── ticlang/                    # Build output (generated)
+├── <project>.projectspec       # CCS import file
+│
+├── hw_delay.c                  # ALL .c files in ROOT (CCS requirement)
+├── hw_buzzer.c
+├── hw_lsm6ds3.c
+├── myiic.c
+├── mid_timer.c
+├── mid_button.c
+├── app_cube.c
+├── OLED.c                      # etc.
+│
+├── hardware/                   # .h HEADERS only
+│   ├── hw_delay.h
+│   ├── hw_buzzer.h
+│   └── hw_lsm6ds3.h
+├── middle/                     # .h HEADERS only
+│   ├── mid_timer.h
+│   └── mid_button.h
+├── app/                        # .h HEADERS only
+│   └── app_cube.h
+└── oledUI/                     # .h HEADERS only
+    ├── OLED.h
+    └── OLED_driver.h
 ```
 
-### Layer Rules
+### Layer Prefix Rules
 
-| Layer | Prefix | Responsibility | Depends on |
-|-------|--------|---------------|------------|
-| `hardware/` | `hw_` | Peripheral drivers, sensor drivers, bit-bang protocols | DriverLib, `ti_msp_dl_config.h` |
-| `middle/` | `mid_` | System services, protocol parsers, reusable components | `hardware/` or DriverLib |
-| `app/` | `app_` | Application tasks, UI pages, game logic | `hardware/` + `middle/` |
+| Layer | Prefix | .c location | .h location |
+|-------|--------|-------------|-------------|
+| Hardware (HAL) | `hw_` | Project root | `hardware/` |
+| Middleware | `mid_` | Project root | `middle/` |
+| Application | `app_` | Project root | `app/` |
+| OLED UI | `OLED_*` | Project root | `oledUI/` |
 
-### Key Conventions
+### Architecture Rules
 
-- **File naming**: `hw_<peripheral>.c`, `mid_<service>.c`, `app_<feature>.c` — prefix indicates layer
-- **No cross-layer back-references**: `hardware/` must not include `middle/` or `app/` headers. `middle/` must not include `app/` headers.
-- **SysConfig ownership**: only `main.c` calls `SYSCFG_DL_init()`. Peripheral drivers receive config via generated macros from `ti_msp_dl_config.h`.
-- **Single responsibility**: each `.c/.h` pair handles one peripheral or one service
-- **Simple projects**: if the project has less than 3 source files, keep everything in root — don't over-layer
-
-### Reference
-
-Full example: `E:\github\OLED_UI\OLED_UI_Examples\MSPM0G3519\ccs\oeldui` (hardware → middle → oledUI → app, 4-layer embedded architecture)
+- **No cross-layer back-references**: `hw_*.c` must not include `mid_*.h` or `app_*.h`. `mid_*.c` must not include `app_*.h`.
+- **SysConfig ownership**: only `main.c` calls `SYSCFG_DL_init()`. Drivers receive config via generated macros.
+- **Single responsibility**: each `.c/.h` pair handles one peripheral or one service.
+- **Simple project exception**: if the project has less than 3 source files total, keep everything in root.
 
 ## Pin Table — Tianqiaoxing MSPM0G3519
 
