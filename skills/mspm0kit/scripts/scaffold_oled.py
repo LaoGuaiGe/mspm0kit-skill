@@ -185,15 +185,26 @@ def main(
     if need_timer:
         extra_entries += _copy_bundled_driver(out, TIMER_C_FILES, out)
         syscfg_addon += SYSCFG_TIMER
+    # 3. Modify syscfg
+    syscfg_file = out / f"{project_name}.syscfg"
+    content = syscfg_file.read_text(encoding="utf-8")
+
     if use_hw_i2c:
         syscfg_addon += SYSCFG_HW_I2C
+        # Remove GPIO pin.$assign to avoid conflict with I2C peripheral on same pins
+        import re
+        content = re.sub(
+            r'GPIO1\.associatedPins\[0\]\.pin\.\$assign\s*=\s*"PA0";',
+            '// GPIO1.associatedPins[0].pin.$assign = "PA0"; // released for HW I2C',
+            content)
+        content = re.sub(
+            r'GPIO1\.associatedPins\[1\]\.pin\.\$assign\s*=\s*"PA1";',
+            '// GPIO1.associatedPins[1].pin.$assign = "PA1"; // released for HW I2C',
+            content)
 
-    # 3. Append syscfg addons
     if syscfg_addon:
-        syscfg_file = out / f"{project_name}.syscfg"
-        syscfg_file.write_text(
-            syscfg_file.read_text(encoding="utf-8") + syscfg_addon, encoding="utf-8"
-        )
+        content += syscfg_addon
+    syscfg_file.write_text(content, encoding="utf-8")
 
     # 4. Append projectspec entries
     if extra_entries:
