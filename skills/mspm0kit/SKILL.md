@@ -34,6 +34,8 @@ Tell the user what you're going to create:
 
 Wait for confirmation before creating files, OR proceed if the user has indicated they want automatic execution.
 
+**If the user is not satisfied with the plan:** Revise it based on their feedback, then **restate the complete revised plan** before writing any code. Do NOT jump straight to implementation — the user must see and approve the changes first. Repeat this loop until the user approves.
+
 ### Step 3 — Code
 
 1. Ask: "是否允许我读取 SDK 目录（`<sdk_root>`）来复制例程模板？"
