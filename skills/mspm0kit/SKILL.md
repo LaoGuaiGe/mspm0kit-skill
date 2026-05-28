@@ -73,29 +73,30 @@ Wait for confirmation before creating files, OR proceed if the user has indicate
 
 ## Core Rules
 
-### R0: CCS FLAT C-FILE RULE (HIGHEST PRIORITY)
+### R0: 4-Layer Embedded Architecture (HIGHEST PRIORITY)
 
-**ALL `.c` source files MUST be placed directly in the project root directory. NEVER put `.c` files in subdirectories.**
-
-CCS compiles every `.c` it finds recursively. If the same file appears in both root and a subdirectory (e.g. `app/buttons.c` AND `buttons.c`), CCS compiles it twice → 100+ "symbol redefined" linker errors.
+All projects must follow the HAL → BSP → Middleware → App 4-layer structure.
 
 ```
-WRONG (will cause linker errors):
-  ├── app/
-  │   └── app_cube.c        ← CCS finds this
-  └── app_cube.c             ← CCS finds this too = DUPLICATE
-
-CORRECT:
-  ├── app_cube.c             ← all .c in root
-  ├── app/                   ← only .h files
-  │   └── app_cube.h
+<project>/
+├── main.c                     # Entry point
+├── <project>.syscfg           # SysConfig
+├── hal/                       # HAL — MCU register abstraction (optional)
+│   └── hal_<periph>.c/h       #   e.g. hal_i2c, hal_timer
+├── bsp/                       # BSP — Board-level peripheral drivers
+│   └── bsp_<device>.c/h       #   e.g. bsp_led, bsp_imu, bsp_i2c
+├── middleware/                 # Middleware — Reusable frameworks & protocols
+│   ├── oled/                  #   OLED UI framework
+│   ├── button/                #   MultiButton library
+│   ├── fusion/                #   AHRS attitude fusion
+│   ├── wireless/              #   Wireless UART protocol
+│   └── timer/                 #   System tick service
+├── app/                       # Application — Project-specific tasks & UI
+│   └── app_<feature>.c/h      #   e.g. app_cube, app_menu
+└── targetConfigs/             # Debug probe config (CCS only)
 ```
 
-**Before reporting a project as complete, verify:**
-```bash
-# Should return NOTHING (no .c in subdirectories)
-find <project> -path "*/Debug" -prune -o -path "*/ticlang" -prune -o -path "*/.git" -prune -o -name "*.c" -print | grep -v "^<project>/[^/]*\.c$"
-```
+**Each module is self-contained**: `.c` and `.h` live together in the same directory.
 
 ### R1: Generated Files
 
@@ -116,54 +117,6 @@ find <project> -path "*/Debug" -prune -o -path "*/ticlang" -prune -o -path "*/.g
 
 - Every access to external paths (CCS, SDK) requires a permission prompt.
 
-## Project Layering
-
-### File Organization (CCS-Compatible)
-
-```
-<project>/
-├── main.c                     # Entry point: init + main loop
-├── <project>.syscfg            # SysConfig: pins, clocks, peripherals
-├── <project>.projectspec       # CCS import file
-│
-├── hw_delay.c                  # ALL .c files in ROOT (CCS requirement)
-├── hw_buzzer.c
-├── hw_lsm6ds3.c
-├── myiic.c
-├── mid_timer.c
-├── mid_button.c
-├── app_cube.c
-├── OLED.c                      # etc.
-│
-├── hardware/                   # .h HEADERS only
-│   ├── hw_delay.h
-│   ├── hw_buzzer.h
-│   └── hw_lsm6ds3.h
-├── middle/                     # .h HEADERS only
-│   ├── mid_timer.h
-│   └── mid_button.h
-├── app/                        # .h HEADERS only
-│   └── app_cube.h
-└── oledUI/                     # .h HEADERS only
-    ├── OLED.h
-    └── OLED_driver.h
-```
-
-### Layer Prefix Rules
-
-| Layer | Prefix | .c location | .h location |
-|-------|--------|-------------|-------------|
-| Hardware (HAL) | `hw_` | Project root | `hardware/` |
-| Middleware | `mid_` | Project root | `middle/` |
-| Application | `app_` | Project root | `app/` |
-| OLED UI | `OLED_*` | Project root | `oledUI/` |
-
-### Architecture Rules
-
-- **No cross-layer back-references**: `hw_*.c` must not include `mid_*.h` or `app_*.h`. `mid_*.c` must not include `app_*.h`.
-- **SysConfig ownership**: only `main.c` calls `SYSCFG_DL_init()`. Drivers receive config via generated macros.
-- **Single responsibility**: each `.c/.h` pair handles one peripheral or one service.
-- **Simple project exception**: if the project has less than 3 source files total, keep everything in root.
 
 ## Pin Table — Tianqiaoxing MSPM0G3519
 

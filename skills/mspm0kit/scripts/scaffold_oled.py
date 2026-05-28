@@ -96,41 +96,43 @@ def _load_config() -> dict:
 
 
 def _copy_bundled_driver(out: Path, files: list[str], dst: Path) -> list[str]:
-    """Copy .c files from bundled examples + their .h files to correct subdirs."""
+    """Copy .c files from bundled examples, preserving directory structure."""
     entries = []
     examples_root = SKILL_DIR / "examples"
-
-    # Map .h file prefixes to subdirectory
-    h_dir_map = {
-        "hw_": "hardware",
-        "mid_": "middle",
-        "app_": "app",
-        "Fusion": "middle",
-        "myiic": "hardware",
-    }
 
     for name in files:
         found = None
         for ex_dir in examples_root.iterdir():
-            if ex_dir.is_dir() and (ex_dir / name).is_file():
-                found = ex_dir / name
+            if not ex_dir.is_dir():
+                continue
+            for f in ex_dir.rglob(name):
+                if f.is_file():
+                    found = f
+                    break
+            if found:
                 break
-        if found:
-            shutil.copy2(found, dst / name)
-            entries.append(f'        <file path="{name}" openOnCreation="false" excludeFromBuild="false" action="copy"/>')
-            # Also copy matching .h file
-            h_name = name.replace(".c", ".h")
-            h_src = found.parent / h_name
-            if h_src.exists():
-                # Determine target subdirectory from file prefix
-                subdir = "hardware"  # default
-                for prefix, sd in h_dir_map.items():
-                    if h_name.startswith(prefix):
-                        subdir = sd
-                        break
-                h_dst = out / subdir
-                h_dst.mkdir(exist_ok=True)
-                shutil.copy2(h_src, h_dst / h_name)
+        if not found:
+            continue
+
+        # Preserve directory structure: copy .c into same-named subdir under project
+        ex_name = None
+        for p in found.parents:
+            if p.parent == examples_root:
+                ex_name = p.name
+                break
+        rel_dir = found.parent.relative_to(examples_root / ex_name) if ex_name else Path(".")
+        target_dir = out / rel_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        shutil.copy2(found, target_dir / name)
+        project_rel = str(target_dir.relative_to(out) / name) if target_dir != out else name
+        entries.append(f'        <file path="{project_rel}" openOnCreation="false" excludeFromBuild="false" action="copy"/>')
+
+        # Copy matching .h from same directory (if found)
+        h_name = name.replace(".c", ".h")
+        h_src = found.parent / h_name
+        if h_src.exists():
+            shutil.copy2(h_src, target_dir / h_name)
 
     return entries
 

@@ -96,39 +96,39 @@ def main(
 
     is_skill_example = (skill_examples_dir / sdk_example).is_dir()
 
-    # 1. Copy .c files — ALL to project root (CCS requires flat .c structure)
-    c_files = list(source_dir.glob("*.c"))
-    src_c_files = list((source_dir / "src").glob("*.c")) if (source_dir / "src").is_dir() else []
-    for cf in c_files + src_c_files:
-        if cf.stem == "main" or cf.parent.name == "src":
-            shutil.copy2(cf, out / cf.name)
+    # 1. Copy ALL files preserving directory structure (skip Debug/ticlang)
+    skip_dirs = {"Debug", "ticlang", "targetConfigs"}
+    for item in source_dir.rglob("*"):
+        if item.is_dir() or any(s in item.parts for s in skip_dirs):
+            continue
+        rel = item.relative_to(source_dir)
+        if rel.parts[0] in skip_dirs:
+            continue
+        dst_file = out / rel
+        dst_file.parent.mkdir(parents=True, exist_ok=True)
+
+        if item.suffix == ".syscfg":
+            content = item.read_text(encoding="utf-8", errors="replace")
+            content = re.sub(r'--package\s+"LQFP-100\(PZ\)"', '--package "LQFP-64(PM)"', content)
+            if item.stem == "example":
+                dst_file = out / f"{project_name}.syscfg"
+            else:
+                dst_file = out / item.name.replace(sdk_example, project_name)
+            dst_file.write_text(content, encoding="utf-8")
+        elif item.suffix == ".c":
+            if item.stem == "main":
+                shutil.copy2(item, out / "main.c")
+            elif item.stem == sdk_example:
+                shutil.copy2(item, out / f"{project_name}.c")
+            elif item.stem != "example":
+                shutil.copy2(item, dst_file)
+        elif item.suffix == ".h":
+            if item.stem != "example":
+                shutil.copy2(item, dst_file)
         else:
-            _copy_and_rename(cf, out, sdk_example, project_name)
+            shutil.copy2(item, dst_file)
 
-    # 2. Copy .h files from src/ to project root (for skill examples, .h stay in src/)
-    src_dir = source_dir / "src"
-    if src_dir.is_dir():
-        dst_headers = out / "src"
-        dst_headers.mkdir(exist_ok=True)
-        for f in src_dir.glob("*.h"):
-            shutil.copy2(f, dst_headers / f.name)
-
-    # 3. Copy .syscfg
-    syscfg_files = list(source_dir.glob("*.syscfg"))
-    for sf in syscfg_files:
-        content = sf.read_text(encoding="utf-8", errors="replace")
-        content = re.sub(
-            r'--package\s+"LQFP-100\(PZ\)"',
-            '--package "LQFP-64(PM)"',
-            content,
-        )
-        if sf.stem == "example":
-            out_name = f"{project_name}.syscfg"
-        else:
-            out_name = sf.name.replace(sdk_example, project_name)
-        (out / out_name).write_text(content, encoding="utf-8")
-
-    # 4. Generate .projectspec
+    # 2. Generate .projectspec
     pspec_files = list((source_dir / "ticlang").glob("*.projectspec")) if (source_dir / "ticlang").is_dir() else []
     if pspec_files:
         for ps in pspec_files:
