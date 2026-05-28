@@ -34,7 +34,7 @@ def _generate_makefile(ticlang_dir: Path, proj: Path, config: dict) -> None:
             include_dirs.add(str(rel.parent))
 
     if not c_files_rel:
-        raise FileNotFoundError("No .c source files found in project")
+        return  # no sources yet, skip makefile generation
 
     # Also add subdirs that have .h files only (for include paths)
     for d in sorted(proj.rglob("*")):
@@ -150,10 +150,10 @@ def main(
     if startup_in_ticlang.exists() and not startup_in_root.exists():
         shutil.copy2(startup_in_ticlang, startup_in_root)
 
-    # Step 2: Ensure ticlang/ exists (auto-generate makefile if needed)
+    # Step 2: Ensure ticlang/ and makefile exist (SysConfig may create ticlang/ but no makefile)
     ticlang_dir = proj / "ticlang"
-    if not ticlang_dir.is_dir():
-        ticlang_dir.mkdir(exist_ok=True)
+    ticlang_dir.mkdir(exist_ok=True)
+    if not (ticlang_dir / "makefile").exists():
         _generate_makefile(ticlang_dir, proj, config)
 
     if _interactive:

@@ -121,11 +121,18 @@ def _copy_bundled_driver(out: Path, files: list[str], dst: Path) -> list[str]:
         project_rel = str(target_dir.relative_to(out) / name) if target_dir != out else name
         entries.append(f'        <file path="{project_rel}" openOnCreation="false" excludeFromBuild="false" action="copy"/>')
 
-        # Copy matching .h from same directory (if found)
-        h_name = name.replace(".c", ".h")
-        h_src = found.parent / h_name
-        if h_src.exists():
-            shutil.copy2(h_src, target_dir / h_name)
+        # Copy matching .h — try exact name, then stripped suffixes
+        for h_candidate in [name.replace(".c", ".h"),
+                            name.replace("_qei.c", ".h").replace("_gpio.c", ".h")]:
+            h_src = found.parent / h_candidate
+            if h_src.exists():
+                shutil.copy2(h_src, target_dir / h_candidate)
+                break
+            # Also check parent directory for shared headers
+            h_src = found.parent.parent / h_candidate
+            if h_src.exists():
+                shutil.copy2(h_src, target_dir / h_candidate)
+                break
 
     return entries
 

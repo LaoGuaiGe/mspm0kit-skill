@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Clean up a CCS project before building — fix common AI-generated mistakes."""
+"""Clean up a CCS project: remove duplicate .c, generated files in root, stale ticlang/."""
 from __future__ import annotations
 
 import shutil
@@ -63,6 +63,6 @@ def main(project_dir: str) -> int:
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python cleanup.py <project_dir>")
-        print("Fixes: duplicate .c, generated files in root, ticlang/, src/ leftovers")
+        print("Fixes: duplicate .c between root and subdirs, generated files in root, ticlang/, src/ leftovers")
         sys.exit(1)
     sys.exit(main(sys.argv[1]))
