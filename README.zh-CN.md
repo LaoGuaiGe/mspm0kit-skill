@@ -161,6 +161,66 @@ skills/tianqiaoxing-g3519/
 
 ---
 
+## 如何新增一个开发板
+
+在 `skills/` 下创建新目录，参考 `mspm0kit/` 的结构：
+
+### 第一步：创建骨架
+
+```
+skills/<board-name>/
+├── SKILL.md              # 主入口：工作流 + 引脚表 + 规则
+├── examples/              # 板载外设独立例程
+├── peripherals/           # 外设参考文档（含引脚映射）
+├── references/            # 板级参考数据（如 I2C 引脚功能表）
+└── scripts/               # 复制 mspm0kit 的脚本或自行定制
+```
+
+### 第二步：编写 SKILL.md
+
+从 `mspm0kit/SKILL.md` 复制模板，替换：
+
+1. **Frontmatter**: `name:` → 你的开发板名
+2. **板级信息**: 芯片型号、封装、工具链版本
+3. **引脚表**: 标注完全不可用 / 板载外设占用 / 可选释放 / 空闲四类
+4. **SDK 例程索引**: 替换为对应芯片的 SDK 例程列表
+5. **工作流**: 保持四步流程
+
+### 第三步：创建板载例程
+
+```
+examples/led_blink/
+├── example.syscfg         # 最小配置：时钟 + 此外设
+├── main.c                 # 示例代码
+├── manifest.json          # 机器可读元数据
+└── src/                   # 驱动 .h 文件
+```
+
+**规则**：`.c` 平铺根目录（CCS 要求），`.h` 放 `src/`，`.syscfg` 含 `@cliArgs` 元数据。
+
+### 第四步：编写外设文档
+
+`peripherals/<name>.md`：SDK 例程名、LP 板→你的板引脚映射、SysConfig JS 代码、生成宏名、踩坑记录。
+
+### 第五步：测试
+
+```bash
+python scripts/scaffold.py test_project uart_rw_multibyte_fifo_poll -o .
+python scripts/build.py test_project
+# CCS -> Import -> CCS Projects from .projectspec
+```
+
+### mspm0kit 文件清单参考
+
+| 内容 | 位置 | 用途 |
+|------|------|------|
+| 引脚表 | `SKILL.md` § Pin Table | Agent 判断引脚可用性 |
+| 板级注意事项 | `SKILL.md` § Core Rules | 如 BSL 引脚警告 |
+| I2C 引脚功能表 | `references/hw_i2c_pins.md` | 硬件 I2C 可用引脚 |
+| 外设文档 | `peripherals/*.md` | SDK 例程 + 引脚映射 + 代码片段 |
+| 独立例程 | `examples/*/` | 自包含 CCS 工程，无需 SDK 或额外仓库 |
+| 路径配置 | `scripts/setup.py` | CCS/SDK/OLED_UI 路径 |
+
 ## 相关链接
 
 - OLED_UI 框架：[github.com/LaoGuaiGe/OLED_UI](https://github.com/LaoGuaiGe/OLED_UI)
