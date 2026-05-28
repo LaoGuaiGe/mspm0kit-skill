@@ -47,7 +47,7 @@ TICLANG_ARMCOMPILER    = {compiler_bin}
 CC   = "${{TICLANG_ARMCOMPILER}}/tiarmclang"
 LNK  = "${{TICLANG_ARMCOMPILER}}/tiarmclang"
 
-CFLAGS = -I.. -I. -I../src \\
+CFLAGS = -I.. -I. -I../src -I../oledUI -I../hardware -I../middle -I../app \\
     -I"${{MSPM0_SDK_INSTALL_DIR}}/source/third_party/CMSIS/Core/Include" \\
     -I"${{MSPM0_SDK_INSTALL_DIR}}/source" \\
     -D__MSPM0G3519__ -gdwarf-3 -mcpu=cortex-m0plus -march=thumbv6m \\
@@ -146,8 +146,16 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Build CCS project")
     parser.add_argument("project_dir", help="Path to project directory")
+    parser.add_argument("-y", "--yes", action="store_true", help="Skip interactive prompts")
+    parser.add_argument("--rebuild", action="store_true", help="Delete ticlang/ and regenerate makefile from scratch")
     args = parser.parse_args()
-    ok, msg = main(args.project_dir)
+    if args.rebuild:
+        import shutil
+        ticlang = Path(args.project_dir) / "ticlang"
+        if ticlang.exists():
+            shutil.rmtree(ticlang)
+            print("[rebuild] removed ticlang/ for fresh regeneration")
+    ok, msg = main(args.project_dir, _interactive=not args.yes)
     if ok:
         print(f"\nBuild successful\n  Output: {msg}")
     else:
