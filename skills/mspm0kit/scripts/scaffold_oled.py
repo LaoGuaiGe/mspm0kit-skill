@@ -137,7 +137,17 @@ uint32_t get_sys_tick_ms(void)    { return sys_tick_ms; }
 # ── Syscfg additions for each module ──
 
 SYSCFG_IMU_ADDON = """
-/* IMU shares I2C0 bus with OLED — no additional GPIO needed */
+/* IMU shares I2C bus with OLED — no additional GPIO needed */
+"""
+
+SYSCFG_HW_I2C_ADDON = """
+/* ---- Hardware I2C0: PA0=SDA, PA1=SCL (replaces software GPIO bit-bang) ---- */
+const I2C  = scripting.addModule("/ti/driverlib/I2C", {}, false);
+const I2C1 = I2C.addInstance();
+I2C1.$name                   = "I2C_0";
+I2C1.peripheral.$assign      = "I2C0";
+I2C1.peripheral.sdaPin.$assign = "PA0";
+I2C1.peripheral.sclPin.$assign = "PA1";
 """
 
 SYSCFG_WS2812_ADDON = """
@@ -320,24 +330,20 @@ Board.peripheral.$assign          = "DEBUGSS";
 Board.peripheral.swclkPin.$assign = "PA20";
 Board.peripheral.swdioPin.$assign = "PA19";
 
-/* ---- Hardware I2C0: PA0=SDA, PA1=SCL (shared by OLED + IMU) ---- */
-const I2C  = scripting.addModule("/ti/driverlib/I2C", {}, false);
-const I2C1 = I2C.addInstance();
-I2C1.$name                   = "I2C_0";
-I2C1.peripheral.$assign      = "I2C0";
-I2C1.peripheral.sdaPin.$assign = "PA0";
-I2C1.peripheral.sclPin.$assign = "PA1";
-
-/* GPIO instances for hardware I2C IOMUX macros (OLED_driver.c needs OLED_SDA_IOMUX etc) */
+/* ---- Software I2C: PA0=SDA, PA1=SCL (shared by OLED + IMU, bit-bang GPIO) ---- */
 GPIO1.$name                              = "OLED";
 GPIO1.associatedPins.create(2);
 GPIO1.associatedPins[0].$name            = "OLED_SDA";
+GPIO1.associatedPins[0].initialValue     = "SET";
 GPIO1.associatedPins[0].assignedPort     = "PORTA";
 GPIO1.associatedPins[0].assignedPin      = "0";
+GPIO1.associatedPins[0].ioStructure      = "OD";
 GPIO1.associatedPins[0].pin.$assign      = "PA0";
 GPIO1.associatedPins[1].$name            = "OLED_SCL";
+GPIO1.associatedPins[1].initialValue     = "SET";
 GPIO1.associatedPins[1].assignedPort     = "PORTA";
 GPIO1.associatedPins[1].assignedPin      = "1";
+GPIO1.associatedPins[1].ioStructure      = "OD";
 GPIO1.associatedPins[1].pin.$assign      = "PA1";
 
 const ProjectConfig              = scripting.addModule("/ti/project_config/ProjectConfig", {}, false);
@@ -435,6 +441,7 @@ def main(
     source: str | None = None,
     config_path: str | None = None,
     mode: str = "draw",
+    use_hw_i2c: bool = False,
     with_imu: bool = False,
     with_ws2812: bool = False,
     with_wireless: bool = False,
@@ -528,6 +535,9 @@ def main(
         syscfg_addon += SYSCFG_WIRELESS_ADDON
         extra_files += '\n        <file path="mid_wireless_uart.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
 
+    if use_hw_i2c:
+        syscfg_addon += SYSCFG_HW_I2C_ADDON
+
     if need_timer:
         (out / "middle" / "mid_timer.h").write_text(MID_TIMER_STUB_H, encoding="utf-8")
         (out / "mid_timer.c").write_text(MID_TIMER_STUB_C, encoding="utf-8")
@@ -571,6 +581,8 @@ if __name__ == "__main__":
     p.add_argument("--with-imu", action="store_true", help="Add LSM6DS3 IMU driver + FusionAhrs")
     p.add_argument("--with-ws2812", action="store_true", help="Add WS2812 RGB LED driver + effects")
     p.add_argument("--with-wireless", action="store_true", help="Add wireless UART module (UART7)")
+    p.add_argument("--i2c", default="sw", choices=["sw", "hw"],
+                   help="I2C mode: sw=software GPIO bit-bang (default), hw=hardware I2C0")
     p.add_argument("--mode", default="draw", choices=["draw", "menu"],
                    help="draw=basic OLED graphics only, menu=full UI with menu engine (default: draw)")
     args = p.parse_args()
@@ -580,6 +592,7 @@ if __name__ == "__main__":
         output_dir=args.output,
         source=args.source,
         mode=args.mode,
+        use_hw_i2c=(args.i2c == "hw"),
         with_imu=args.with_imu,
         with_ws2812=args.with_ws2812,
         with_wireless=args.with_wireless,

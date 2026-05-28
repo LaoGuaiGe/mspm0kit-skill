@@ -18,7 +18,10 @@ When the user requests a new project, follow these four steps:
 1. Identify the peripheral(s) the user wants (UART, GPIO, PWM, SPI, I2C, ADC, Timer).
 2. Check the pin table below to confirm target pins are available.
 3. Read the corresponding `peripherals/<peripheral>.md` for the SDK example name and pin mapping.
-4. Confirm clock needs (default: 80 MHz CPUCLK with 40 MHz HFXT).
+4. **If I2C is involved:** Ask the user: "你需要软件 I2C（默认，GPIO 位模拟，任意引脚）还是硬件 I2C（更快更稳定，需使用 I2C 功能引脚）？"
+   - Software I2C (default): use `scaffold_oled.py` without `--i2c hw`
+   - Hardware I2C: use `--i2c hw`, verify pins against `references/hw_i2c_pins.md`
+5. Confirm clock needs (default: 80 MHz CPUCLK with 40 MHz HFXT).
 
 ### Step 2 — Plan
 
