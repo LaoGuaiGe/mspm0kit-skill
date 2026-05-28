@@ -9,8 +9,11 @@ from pathlib import Path
 
 
 def _load_config(config_path: str) -> dict:
-    with open(config_path, encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
 
 def _copy_and_rename(src: Path, dst: Path, old_name: str, new_name: str) -> None:

@@ -38,6 +38,28 @@ PB0–PB5, PB10–PB16, PB19, PB20, PB24, PB25, PB28
 
 (Excludes any pin listed as occupied in SKILL.md)
 
+## SysConfig Enum Values
+
+| Field | Valid Values | NOT Valid |
+|-------|-------------|-----------|
+| `initialValue` | `"SET"` (HIGH), `"CLEARED"` (LOW) | `"CLEAR"`, `"LOW"`, `"HIGH"`, `"1"`, `"0"` |
+| `direction` | `"OUTPUT"`, `"INPUT"` | — |
+| `internalResistor` | `"PULL_UP"`, `"PULL_DOWN"`, `"NONE"` | — |
+| `ioStructure` | `"OD"` (open-drain), omitted for push-pull | — |
+
+## Naming Rules
+
+1. **GPIO instance `$name` and pin `$name` MUST NOT be equal** — SysConfig treats them as globally unique identifiers.
+   - WRONG: instance=`"LED"`, pin=`"LED"` → Duplicate name error
+   - CORRECT: instance=`"LED"`, pin=`"PIN"` or `"OUT"`
+
+2. **Generated macro format**:
+   - Port macro: `<INSTANCE>_PORT` → e.g. `LED_PORT` = `GPIOB`
+   - Pin macro: `<INSTANCE>_<PIN>_PIN` → e.g. `LED_PIN_PIN` = `DL_GPIO_PIN_22`
+   - IOMUX macro: `<INSTANCE>_<PIN>_IOMUX` → e.g. `LED_PIN_IOMUX` = `IOMUX_PINCM50`
+
+3. **Always run SysConfig first**, then `grep` the generated `ti_msp_dl_config.h` to confirm actual macro names before writing code.
+
 ## SysConfig JS Snippet
 
 ### Output (LED, active-low)

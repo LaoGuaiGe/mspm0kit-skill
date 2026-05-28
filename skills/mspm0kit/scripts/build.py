@@ -9,8 +9,11 @@ from pathlib import Path
 
 
 def _load_config(config_path: str) -> dict:
-    with open(config_path, encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
 
 def _generate_makefile(ticlang_dir: Path, proj: Path, config: dict) -> None:
@@ -138,6 +141,14 @@ def main(
     result = subprocess.run(sysconfig_cmd, capture_output=True, text=True, cwd=str(proj))
     if result.returncode != 0:
         return False, f"SysConfig failed:\n{result.stderr}\n{result.stdout}"
+
+    # After SysConfig: copy startup file from ticlang/ to project root
+    # (SysConfig CLI outputs to --output dir, but makefile expects it at project root)
+    startup_name = "startup_mspm0g351x_ticlang.c"
+    startup_in_ticlang = proj / "ticlang" / startup_name
+    startup_in_root = proj / startup_name
+    if startup_in_ticlang.exists() and not startup_in_root.exists():
+        shutil.copy2(startup_in_ticlang, startup_in_root)
 
     # Step 2: Ensure ticlang/ exists (auto-generate makefile if needed)
     ticlang_dir = proj / "ticlang"

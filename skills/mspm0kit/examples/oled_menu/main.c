@@ -1,5 +1,6 @@
-\
+
 #include "ti_msp_dl_config.h"
+#include "hw_delay.h"
 #include "OLED_UI.h"
 
 extern MenuPage MainMenuPage;
