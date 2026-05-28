@@ -17,7 +17,6 @@ DEFAULTS = {
     "compiler": r"D:\TI\CCS\ccs\tools\compiler\ti-cgt-armllvm_4.0.3.LTS",
     "sdk_examples": r"D:\TI\CCS\mspm0_sdk_2_05_01_00\examples\nortos\LP_MSPM0G3519\driverlib",
     "probe": "XDS110",
-    "oled_ui_source": "",
 }
 
 
@@ -36,10 +35,6 @@ def interactive_config() -> dict:
     ccs_root = _safe_prompt("CCS install dir", DEFAULTS["ccs_root"])
     sdk_root = _safe_prompt("MSPM0 SDK dir", DEFAULTS["sdk_root"])
     probe = _safe_prompt("Debug probe (XDS110/JLink)", DEFAULTS["probe"])
-    oled_ui = _safe_prompt(
-        "OLED_UI CCS project path (must contain oledUI/OLED.c, leave empty to skip)",
-        DEFAULTS["oled_ui_source"],
-    )
     return {
         "ccs_root": ccs_root,
         "sdk_root": sdk_root,
@@ -49,7 +44,6 @@ def interactive_config() -> dict:
         "compiler": DEFAULTS["compiler"],
         "sdk_examples": str(Path(sdk_root) / "examples/nortos/LP_MSPM0G3519/driverlib"),
         "probe": probe,
-        "oled_ui_source": oled_ui,
     }
 
 
@@ -70,7 +64,6 @@ if __name__ == "__main__":
     p.add_argument("--ccs-root", default=None)
     p.add_argument("--sdk-root", default=None)
     p.add_argument("--probe", default=None, choices=["XDS110", "JLink"])
-    p.add_argument("--oled-ui-source", default=None)
     args = p.parse_args()
 
     if args.accept_defaults or not sys.stdin.isatty():
@@ -84,7 +77,6 @@ if __name__ == "__main__":
             "sdk_examples": str(Path(args.sdk_root or DEFAULTS["sdk_root"])
                 / "examples/nortos/LP_MSPM0G3519/driverlib"),
             "probe": args.probe or DEFAULTS["probe"],
-            "oled_ui_source": args.oled_ui_source or DEFAULTS["oled_ui_source"],
         }
     else:
         config = interactive_config()

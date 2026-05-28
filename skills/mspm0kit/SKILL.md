@@ -229,7 +229,7 @@ If `config.json` does not exist, run `python scripts/setup.py` first.
 | `python scripts/flash.py <project_dir>` | DSLite flash |
 | `python scripts/serial_console.py <port> -b <baud>` | Serial monitor |
 | `python scripts/cleanup.py <project_dir>` | **MANDATORY before build**: fix .c in subdirs, remove generated files from root |
-| `python scripts/scaffold_oled.py <name>` | Generate OLED UI framework project (from local OLED_UI repo) |
+| `python scripts/scaffold_oled.py <name> [--mode menu] [--with-imu] [--i2c hw]` | Generate OLED UI project (bundled, no external repo needed) |
 
 ## SDK Example Index
 
@@ -262,15 +262,16 @@ These are self-contained in the skill's `examples/` directory. They do NOT requi
 | WS2812 RGB LED | `ws2812_rgb` | PB26 | `scaffold.py <name> ws2812_rgb` |
 | IMU LSM6DS3 | `imu_lsm6ds3` | PA27/PA28 | `scaffold.py <name> imu_lsm6ds3` |
 
-### OLED UI Framework (from local repo)
+### OLED UI Framework (bundled, no external dependencies)
 
 When the user asks to "移植屏幕UI" or "add OLED display":
 
-1. Run `python scripts/scaffold_oled.py <project_name>` (not the standard scaffold.py)
-2. This copies the minimal OLED UI framework from the local `OLED_UI` repo
-3. Optional modules: `--with-imu`, `--with-ws2812`, `--with-wireless` (can be combined)
-4. Does NOT include: games, external Flash fonts
-5. Reference: `peripherals/oled_ui.md` for API, `peripherals/imu.md` / `ws2812.md` / `wireless_uart.md` for modules
+1. Run `python scripts/scaffold_oled.py <project_name>` — uses bundled examples, no external repo needed
+2. `--mode draw` (default): basic drawing API (OLED_Init, ShowString, PrintfMix)
+3. `--mode menu`: full menu engine with pages, cursor, animations
+4. Optional: `--with-imu`, `--with-ws2812`, `--with-wireless`, `--i2c hw`
+5. Built-in bitmap fonts (F6x8~F10x20 ASCII + CF12x12~CF20x20 Chinese), no Flash required
+6. Reference: `peripherals/oled_ui.md` for API
 
 ## External Modules
 

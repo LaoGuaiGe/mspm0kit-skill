@@ -1,0 +1,328 @@
+\
+/**
+ * @cliArgs --device "MSPM0G351X" --part "Default" --package "LQFP-64(PM)" --product "mspm0_sdk@2.05.01.01"
+ * @v2CliArgs --device "MSPM0G3519" --package "LQFP-64(PM)" --product "mspm0_sdk@2.05.01.01"
+ * @versions {"tool":"1.24.0+4110"}
+ */
+
+const GPIO   = scripting.addModule("/ti/driverlib/GPIO", {}, false);
+const GPIO1  = GPIO.addInstance();
+const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
+
+/* ---- 80 MHz clock tree: 40 MHz HFXT - SYSPLL - 80 MHz CPUCLK ---- */
+SYSCTL.forceDefaultClkConfig = true;
+SYSCTL.clockTreeEn           = true;
+scripting.suppress("For best practices when the CPUCLK is running at 32MHz and above, clear the flash status bit using DL_FlashCTL_executeClearStatus\\\\(\\\\) before executing any flash operation\\\\. Otherwise there may be false positives\\\\.", SYSCTL);
+
+const divider9       = system.clockTree["UDIV"];
+divider9.divideValue = 2;
+
+const multiplier2         = system.clockTree["PLL_QDIV"];
+multiplier2.multiplyValue = 4;
+
+const mux4       = system.clockTree["EXHFMUX"];
+mux4.inputSelect = "EXHFMUX_XTAL";
+
+const mux8       = system.clockTree["HSCLKMUX"];
+mux8.inputSelect = "HSCLKMUX_SYSPLL0";
+
+const mux12       = system.clockTree["SYSPLLMUX"];
+mux12.inputSelect = "zSYSPLLMUX_HFCLK";
+
+const pinFunction4                        = system.clockTree["HFXT"];
+pinFunction4.inputFreq                    = 40;
+pinFunction4.enable                       = true;
+pinFunction4.HFXTStartup                  = 10;
+pinFunction4.HFCLKMonitor                 = true;
+pinFunction4.peripheral.$assign           = "SYSCTL";
+pinFunction4.peripheral.hfxInPin.$assign  = "PA5";
+pinFunction4.peripheral.hfxOutPin.$assign = "PA6";
+
+/* ---- Board: SWD debug ---- */
+const Board                       = scripting.addModule("/ti/driverlib/Board", {}, false);
+Board.peripheral.$assign          = "DEBUGSS";
+Board.peripheral.swclkPin.$assign = "PA20";
+Board.peripheral.swdioPin.$assign = "PA19";
+
+/* ---- Software I2C: PA0=SDA, PA1=SCL (shared by OLED + IMU, bit-bang GPIO) ---- */
+GPIO1.$name                              = "OLED";
+GPIO1.associatedPins.create(2);
+GPIO1.associatedPins[0].$name            = "SDA";
+GPIO1.associatedPins[0].initialValue     = "SET";
+GPIO1.associatedPins[0].assignedPort     = "PORTA";
+GPIO1.associatedPins[0].assignedPin      = "0";
+GPIO1.associatedPins[0].ioStructure      = "OD";
+GPIO1.associatedPins[0].pin.$assign      = "PA0";
+GPIO1.associatedPins[1].$name            = "SCL";
+GPIO1.associatedPins[1].initialValue     = "SET";
+GPIO1.associatedPins[1].assignedPort     = "PORTA";
+GPIO1.associatedPins[1].assignedPin      = "1";
+GPIO1.associatedPins[1].ioStructure      = "OD";
+GPIO1.associatedPins[1].pin.$assign      = "PA1";
+
+const ProjectConfig              = scripting.addModule("/ti/project_config/ProjectConfig", {}, false);
+ProjectConfig.migrationCondition = true;
+"""
+
+PROJECTSPEC_TEMPLATE = """\
+<?xml version="1.0" encoding="UTF-8"?>
+<projectSpec>
+    <applicability>
+        <when>
+            <context deviceFamily="ARM" deviceId="MSPM0G3519"/>
+        </when>
+    </applicability>
+    <project
+        title="{project_name}"
+        name="{project_name}"
+        configurations="Debug"
+        toolChain="TICLANG"
+        connection="TIXDS110_Connection.xml"
+        device="MSPM0G3519"
+        ignoreDefaultDeviceSettings="true"
+        ignoreDefaultCCSSettings="true"
+        products="MSPM0-SDK;sysconfig"
+        compilerBuildOptions="
+            -I${{PROJECT_ROOT}}
+            -I${{PROJECT_ROOT}}/${{ConfigName}}
+            -I${{PROJECT_ROOT}}/oledUI
+            -I${{PROJECT_ROOT}}/hardware
+            -I${{PROJECT_ROOT}}/app
+            -I${{PROJECT_ROOT}}/middle
+            -O2
+            @device.opt
+            -I${{COM_TI_MSPM0_SDK_INSTALL_DIR}}/source/third_party/CMSIS/Core/Include
+            -I${{COM_TI_MSPM0_SDK_INSTALL_DIR}}/source
+            -gdwarf-3
+            -mcpu=cortex-m0plus
+            -march=thumbv6m
+            -mfloat-abi=soft
+            -mthumb
+        "
+        linkerBuildOptions="
+            -ldevice.cmd.genlibs
+            -L${{COM_TI_MSPM0_SDK_INSTALL_DIR}}/source
+            -L${{PROJECT_ROOT}}
+            -L${{PROJECT_BUILD_DIR}}/syscfg
+            -Wl,--rom_model
+            -Wl,--warn_sections
+            -L${{CG_TOOL_ROOT}}/lib
+            -llibc.a
+        "
+        sysConfigBuildOptions="
+            --output .
+            --product ${{COM_TI_MSPM0_SDK_INSTALL_DIR}}/.metadata/product.json
+            --compiler ticlang
+        "
+        sourceLookupPath="${{COM_TI_MSPM0_SDK_INSTALL_DIR}}/source/ti/driverlib"
+        description="OLED UI Framework for Tianqiaoxing MSPM0G3519">
+        <property name="buildProfile" value="release"/>
+        <property name="isHybrid" value="true"/>
+        <file path="main.c" openOnCreation="true" excludeFromBuild="false" action="copy"/>
+        <file path="{project_name}.syscfg" openOnCreation="true" excludeFromBuild="false" action="copy"/>
+        <file path="myiic.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="hw_delay.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="OLED.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="OLED_driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="OLED_Fonts.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+        <file path="oled_ext_font.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>
+{menu_file_entries}
+{extra_file_entries}
+    </project>
+</projectSpec>
+"""
+
+
+def _trim_file(src: Path, dst: Path, remove_includes: list[str], remove_funcs: list[str] | None = None) -> None:
+    """Copy a file, removing specified #include lines and optional function bodies."""
+    lines = src.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+    result = []
+    for line in lines:
+        stripped = line.strip()
+        skip = False
+        for pat in remove_includes:
+            if pat in stripped:
+                skip = True
+                break
+        if not skip:
+            result.append(line)
+    dst.write_text("".join(result), encoding="utf-8")
+
+
+def main(
+    project_name: str,
+    output_dir: str | None = None,
+    source: str | None = None,
+    config_path: str | None = None,
+    mode: str = "draw",
+    use_hw_i2c: bool = False,
+    with_imu: bool = False,
+    with_ws2812: bool = False,
+    with_wireless: bool = False,
+) -> Path:
+    cfg_file = config_path or str(Path(__file__).resolve().parents[1] / "config.json")
+    config = _load_config(cfg_file) if Path(cfg_file).exists() else {}
+    src_root = _find_source(source, config)
+    out = Path(output_dir or Path.cwd()) / project_name
+    out.mkdir(parents=True, exist_ok=True)
+
+    need_timer = with_imu or with_ws2812
+    extra_files = ""
+    syscfg_addon = ""
+
+    # ── directories (headers only, .c files go in root for CCS compatibility) ──
+    for d in ["oledUI", "hardware", "app", "middle"]:
+        (out / d).mkdir(exist_ok=True)
+
+    is_menu = (mode == "menu")
+
+    # ── 1. Copy core OLED files ──
+    # .c files → project root, .h files → oledUI/ (or hardware/ for myiic)
+    oled_c_files = ["OLED.c", "OLED_driver.c", "OLED_Fonts.c", "oled_ext_font.c"]
+    for stem in oled_c_files:
+        # oled_ext_font.c is replaced with built-in font version (no Flash needed)
+        if stem == "oled_ext_font.c":
+            (out / stem).write_text(OLED_EXT_FONT_BUILTIN_C, encoding="utf-8")
+            continue
+        src_file = src_root / "oledUI" / stem
+        if src_file.exists():
+            shutil.copy2(src_file, out / stem)
+
+    oled_h_files = ["OLED.h", "OLED_driver.h", "OLED_Fonts.h", "oled_ext_font.h",
+                    "OLED_UI_Driver.h"]
+    for stem in oled_h_files:
+        src_file = src_root / "oledUI" / stem
+        if src_file.exists():
+            shutil.copy2(src_file, out / "oledUI" / stem)
+
+    if is_menu:
+        # .c to root
+        _trim_file(src_root / "oledUI" / "OLED_UI.c", out / "OLED_UI.c",
+                   remove_includes=['#include "app_task.h"'])
+        _trim_file(src_root / "oledUI" / "OLED_UI_Driver.c", out / "OLED_UI_Driver.c",
+                   remove_includes=['#include "hw_encoder.h"'])
+        (out / "OLED_UI_MenuData.c").write_text(MENU_DATA_C, encoding="utf-8")
+        # .h to subdirs
+        shutil.copy2(src_root / "oledUI" / "OLED_UI.h", out / "oledUI" / "OLED_UI.h")
+        shutil.copy2(src_root / "oledUI" / "OLED_UI_MenuData.h", out / "oledUI" / "OLED_UI_MenuData.h")
+        # Stub files
+        (out / "app" / "app_task_stub.h").write_text(APP_TASK_STUB_H, encoding="utf-8")
+        (out / "app_task_stub.c").write_text(APP_TASK_STUB_C, encoding="utf-8")
+        (out / "hardware" / "hw_encoder_stub.h").write_text(HW_ENCODER_STUB_H, encoding="utf-8")
+        # Fix OLED_UI.c include
+        ui_c = (out / "OLED_UI.c").read_text(encoding="utf-8")
+        ui_c = '#include "app_task_stub.h"\n' + ui_c
+        (out / "OLED_UI.c").write_text(ui_c, encoding="utf-8")
+
+    # ── 2. Hardware deps (.c to root, .h to hardware/) ──
+    for stem in ["myiic.c", "hw_delay.c"]:
+        shutil.copy2(src_root / "hardware" / stem, out / stem)
+    for stem in ["myiic.h", "hw_delay.h"]:
+        shutil.copy2(src_root / "hardware" / stem, out / "hardware" / stem)
+
+    # ── 3. Optional modules ──
+
+    if with_imu:
+        # .c to root
+        for c_stem in ["hw_lsm6ds3.c", "FusionAhrs.c", "FusionOffset.c"]:
+            src_file = (src_root / "hardware" / c_stem) if c_stem.startswith("hw_") else (src_root / "middle" / c_stem)
+            if src_file.exists():
+                shutil.copy2(src_file, out / c_stem)
+        # .h to subdirs
+        for h_stem in ["hw_lsm6ds3.h"]:
+            shutil.copy2(src_root / "hardware" / h_stem, out / "hardware" / h_stem)
+        for h_stem in ["FusionAhrs.h", "FusionOffset.h", "FusionConvention.h", "FusionMath.h"]:
+            shutil.copy2(src_root / "middle" / h_stem, out / "middle" / h_stem)
+        syscfg_addon += SYSCFG_IMU_ADDON
+        extra_files += '\n        <file path="hw_lsm6ds3.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="FusionAhrs.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="FusionOffset.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+
+    if with_ws2812:
+        for c_stem in ["hw_ws2812.c", "hw_ws2812_effects.c"]:
+            shutil.copy2(src_root / "hardware" / c_stem, out / c_stem)
+        for h_stem in ["hw_ws2812.h", "hw_ws2812_effects.h"]:
+            shutil.copy2(src_root / "hardware" / h_stem, out / "hardware" / h_stem)
+        syscfg_addon += SYSCFG_WS2812_ADDON
+        extra_files += '\n        <file path="hw_ws2812.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        extra_files += '\n        <file path="hw_ws2812_effects.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+
+    if with_wireless:
+        shutil.copy2(src_root / "middle" / "mid_wireless_uart.c", out / "mid_wireless_uart.c")
+        shutil.copy2(src_root / "middle" / "mid_wireless_uart.h", out / "middle" / "mid_wireless_uart.h")
+        syscfg_addon += SYSCFG_WIRELESS_ADDON
+        extra_files += '\n        <file path="mid_wireless_uart.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+
+    if use_hw_i2c:
+        syscfg_addon += SYSCFG_HW_I2C_ADDON
+
+    if need_timer:
+        (out / "middle" / "mid_timer.h").write_text(MID_TIMER_STUB_H, encoding="utf-8")
+        (out / "mid_timer.c").write_text(MID_TIMER_STUB_C, encoding="utf-8")
+        syscfg_addon += SYSCFG_TIMER_ADDON
+        extra_files += '\n        <file path="mid_timer.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+
+    # ── 4. Generated files ──
+    if is_menu:
+        (out / "main.c").write_text(MAIN_C_TEMPLATE, encoding="utf-8")
+    else:
+        (out / "main.c").write_text(DRAW_MAIN_C, encoding="utf-8")
+
+    syscfg_content = SYSCFG_TEMPLATE + syscfg_addon
+    (out / f"{project_name}.syscfg").write_text(syscfg_content, encoding="utf-8")
+
+    # ── 5. projectspec — CCS auto-generates device_linker.cmd via SysConfig ──
+    menu_files = ""
+    if is_menu:
+        menu_files = '\n        <file path="OLED_UI.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="OLED_UI_Driver.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="OLED_UI_MenuData.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+        menu_files += '\n        <file path="app_task_stub.c" openOnCreation="false" excludeFromBuild="false" action="copy"/>'
+
+    pspec = PROJECTSPEC_TEMPLATE.format(
+        project_name=project_name,
+        extra_file_entries=extra_files,
+        menu_file_entries=menu_files,
+    )
+    (out / f"{project_name}.projectspec").write_text(pspec, encoding="utf-8")
+
+    return out
+
+
+if __name__ == "__main__":
+    import argparse
+
+    p = argparse.ArgumentParser(description="Scaffold OLED UI framework project for Tianqiaoxing G3519")
+    p.add_argument("project_name", help="Project name")
+    p.add_argument("-o", "--output", default=None, help="Parent output dir (default: cwd)")
+    p.add_argument("--source", default=None, help="Path to OLED_UI repo")
+    p.add_argument("--with-imu", action="store_true", help="Add LSM6DS3 IMU driver + FusionAhrs")
+    p.add_argument("--with-ws2812", action="store_true", help="Add WS2812 RGB LED driver + effects")
+    p.add_argument("--with-wireless", action="store_true", help="Add wireless UART module (UART7)")
+    p.add_argument("--i2c", default="sw", choices=["sw", "hw"],
+                   help="I2C mode: sw=software GPIO bit-bang (default), hw=hardware I2C0")
+    p.add_argument("--mode", default="draw", choices=["draw", "menu"],
+                   help="draw=basic OLED graphics only, menu=full UI with menu engine (default: draw)")
+    args = p.parse_args()
+
+    result = main(
+        project_name=args.project_name,
+        output_dir=args.output,
+        source=args.source,
+        mode=args.mode,
+        use_hw_i2c=(args.i2c == "hw"),
+        with_imu=args.with_imu,
+        with_ws2812=args.with_ws2812,
+        with_wireless=args.with_wireless,
+    )
+
+    modules = []
+    if args.with_imu: modules.append("IMU")
+    if args.with_ws2812: modules.append("WS2812")
+    if args.with_wireless: modules.append("Wireless UART")
+
+    print(f"OLED UI project created: {result}")
+    if modules:
+        print(f"  Modules enabled: {', '.join(modules)}")
+    print(f"  Import in CCS: File → Import → CCS Projects from .projectspec")
+    print(f"  Select: {result}/{args.project_name}.projectspec")
