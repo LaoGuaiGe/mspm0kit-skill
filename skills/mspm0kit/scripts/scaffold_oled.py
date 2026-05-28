@@ -137,20 +137,7 @@ uint32_t get_sys_tick_ms(void)    { return sys_tick_ms; }
 # ── Syscfg additions for each module ──
 
 SYSCFG_IMU_ADDON = """
-/* ---- IMU I2C: PA28=SDA, PA27=SCL ---- */
-const GPIO2  = GPIO.addInstance();
-GPIO2.$name                          = "IMU";
-GPIO2.associatedPins.create(2);
-GPIO2.associatedPins[0].$name        = "IMU_SDA";
-GPIO2.associatedPins[0].initialValue = "SET";
-GPIO2.associatedPins[0].assignedPort = "PORTA";
-GPIO2.associatedPins[0].assignedPin  = "28";
-GPIO2.associatedPins[0].pin.$assign  = "PA28";
-GPIO2.associatedPins[1].$name        = "IMU_SCL";
-GPIO2.associatedPins[1].initialValue = "SET";
-GPIO2.associatedPins[1].assignedPort = "PORTA";
-GPIO2.associatedPins[1].assignedPin  = "27";
-GPIO2.associatedPins[1].pin.$assign  = "PA27";
+/* IMU shares I2C0 bus with OLED — no additional GPIO needed */
 """
 
 SYSCFG_WS2812_ADDON = """
@@ -333,20 +320,24 @@ Board.peripheral.$assign          = "DEBUGSS";
 Board.peripheral.swclkPin.$assign = "PA20";
 Board.peripheral.swdioPin.$assign = "PA19";
 
-/* ---- OLED I2C: PA0=SDA, PA1=SCL ---- */
+/* ---- Hardware I2C0: PA0=SDA, PA1=SCL (shared by OLED + IMU) ---- */
+const I2C  = scripting.addModule("/ti/driverlib/I2C", {}, false);
+const I2C1 = I2C.addInstance();
+I2C1.$name                   = "I2C_0";
+I2C1.peripheral.$assign      = "I2C0";
+I2C1.peripheral.sdaPin.$assign = "PA0";
+I2C1.peripheral.sclPin.$assign = "PA1";
+
+/* GPIO instances for hardware I2C IOMUX macros (OLED_driver.c needs OLED_SDA_IOMUX etc) */
 GPIO1.$name                              = "OLED";
 GPIO1.associatedPins.create(2);
 GPIO1.associatedPins[0].$name            = "OLED_SDA";
-GPIO1.associatedPins[0].initialValue     = "SET";
 GPIO1.associatedPins[0].assignedPort     = "PORTA";
 GPIO1.associatedPins[0].assignedPin      = "0";
-GPIO1.associatedPins[0].ioStructure      = "OD";
 GPIO1.associatedPins[0].pin.$assign      = "PA0";
 GPIO1.associatedPins[1].$name            = "OLED_SCL";
-GPIO1.associatedPins[1].initialValue     = "SET";
 GPIO1.associatedPins[1].assignedPort     = "PORTA";
 GPIO1.associatedPins[1].assignedPin      = "1";
-GPIO1.associatedPins[1].ioStructure      = "OD";
 GPIO1.associatedPins[1].pin.$assign      = "PA1";
 
 const ProjectConfig              = scripting.addModule("/ti/project_config/ProjectConfig", {}, false);

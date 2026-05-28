@@ -126,9 +126,8 @@ Full example: `E:\github\OLED_UI\OLED_UI_Examples\MSPM0G3519\ccs\oeldui` (hardwa
 
 | Pin(s) | Occupied by |
 |--------|-------------|
-| PA0, PA1 | Software I2C — OLED (2.2kΩ pull-up on board) |
+| PA0, PA1 | Hardware I2C0 — OLED + IMU (shared bus, 2.2kΩ pull-up on board) |
 | PA10, PA11 | UART0 to CH340 USB-C (排针 can share TX/RX) |
-| PA27, PA28 | Software I2C — LSM6DS3 IMU |
 | PB6, PB7, PB8, PB9 | SPI1 — W25Q128 Flash (CS/MISO/MOSI/SCLK) |
 | PB17, PB18 | UART7 — wireless UART module |
 | PB21 | ENTER button (PULL_UP, active-low) |
